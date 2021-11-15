@@ -34,7 +34,7 @@ DefaultContentLanguage           = "en"                    # Default language fo
     [params.share]
         twitter                  = true
         facebook                 = true
-        pinterest                = true
+        linkedin                 = true
 
     # Social icons appear in introduction and contact section. Add as many more as you like.
     # Icon pack "fab" includes social network icons, see: https://fontawesome.com/icons?d=gallery&s=brands&m=free
@@ -98,31 +98,31 @@ DefaultContentLanguage           = "en"                    # Default language fo
 [languages]
     [languages.en]
         languageName     = "English"
-        languageCode     = "en-us"
+        languageCode     = "en"
         contentDir       = "content/en"
         weight           = 0
         title            = "Introduction"
         [languages.en.params]
-            description  = "Website Description"   # Max 160 characters show in search results
+            description  = "Site descriptin"   # Max 160 characters show in search results
             # footerText   = ""                      # Text to override default footer text (markdown allowed)
 
-    [languages.es]
-        languageName     = "Español"
-        languageCode     = "es"
-        contentDir       = "content/es"
-        weight           = 1
-        title            = "Introducción"
-        [languages.es.params]
-            description  = "Descripcion del sitio web"
+    #[languages.es]
+        #languageName     = "Español"
+        #languageCode     = "es"
+        #contentDir       = "content/es"
+        #weight           = 1
+        #title            = "Introducción"
+        #[languages.es.params]
+            #description  = "Descripcion del sitio web"
             # footerText   = ""
 
     [languages.de]
-        languageName     = "Deutsch"
-        languageCode     = "de"
+        languageName     = "Portuguese"
+        languageCode     = "pt-BR"
         contentDir       = "content/de"
         weight           = 2
-        title            = "Vorstellung"
+        title            = "Portuguese"
         [languages.de.params]
             dateFormat   = "2. January 2006"
-            description  = "Beschreibung der Webseite"
+            description  = "Descrição do site"
             # footerText   = ""

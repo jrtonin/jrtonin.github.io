@@ -1,5 +1,5 @@
 ---
-title: "Lorem Ipsum"
+title: "Thesis"
 weight: 30
 ---
 

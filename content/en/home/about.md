@@ -4,14 +4,17 @@ image: "profile.jpg"
 weight: 8
 ---
 
-This is **Introduction**, a minimalist website theme made for [Hugo](https://gohugo.io).
+I'm a professional focused on results. I have a high level of personal determination and influence, in addition to experience in teamwork and project management. I'm constantly learning, and I use creativity and information intelligence to generate competitive advantages for organizations.
 
-### Features
+\* Curitiba, Brazil <br /> 
+\* Budge Budget and Finance Manager at Paraná Projetos <br /> 
+\* Doctorate in Economics from Federal University of Parana <br /> 
+\* Radio Personality at CBN Maringá News
 
-* Responsive display on any size screen
-* Light and Dark themes right out of the box
-* Multilingual - supports side-by-side content in multiple languages
-* Any number of custom index page sections from Markdown files
-* _Projects_ section with any number of projects: highly configurable as a photo gallery, modals, or external links
-* _Blog_ section with optional _Latest Post_, on the main page or as a separate section
-* Styled Markdown throughout with support for Hugo's syntax highlighting
+#### Experience | Skills
+
+* 3 years   | Data Scientist: R, Gempack and PowerBI 
+* 8 years   | Public teamwork and project management
+* 10 years  | Economist
+
+For more information, please access [Linkedin profile](https://www.linkedin.com/in/jrtonin/?locale=en_US)
