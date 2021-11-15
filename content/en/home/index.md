@@ -1,5 +1,5 @@
 ---
-title: "Hi, I'm João Ricardo Tonin"
+title: "Hi, I'm Tonin"
 headless: true
 ---
 
