@@ -1,6 +1,6 @@
 ---
-title: "Hi, I'm Introduction"
+title: "Hi, I'm João Ricardo Tonin"
 headless: true
 ---
 
-I'm a theme for Hugo
+Economist and Data Scientist
