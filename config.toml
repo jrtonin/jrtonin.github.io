@@ -1,4 +1,4 @@
-baseURL                          = "http://example.com/"   # Your domain name. Must end with "/"
+baseURL                          = "https://jrtonin.github.io/"   # Your domain name. Must end with "/"
 themeDir                         = "themes"
 theme                            = "introduction"
 DefaultContentLanguage           = "en"                    # Default language for multilingual sites
