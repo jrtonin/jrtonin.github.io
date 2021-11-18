@@ -33,6 +33,10 @@ memory.limit(size = 999999999999)
 
 # reading databases
 LBASE1 = readRDS(url("https://github.com/jrtonin/thesis_essay_ii/raw/main/data/LBASE1_Essay_II.rds"))
+LBASE1c = readRDS(url("https://github.com/jrtonin/thesis_essay_ii/raw/main/data/LBASE1c_Essay_II.rds"))
+LBASE2 = readRDS(url("https://github.com/jrtonin/thesis_essay_ii/raw/main/data/LBASE2_Essay_II.rds"))
+LBASE2c = readRDS(url("https://github.com/jrtonin/thesis_essay_ii/raw/main/data/LBASE2c_Essay_II.rds"))
+
 ```
 
 ```{r databases, warning=FALSE, message=FALSE, error=FALSE, include=TRUE, echo = FALSE}
@@ -54,6 +58,61 @@ dLBASE1 = pdata.frame(dLBASE1, index = c("id","time")) %>%
   ungroup() %>% arrange(year, month)
 
 } # organizing LBASE1
+
+{
+# organizing database
+dLBASE1c = LBASE1c %>% 
+  ungroup() %>%
+  arrange(year, month, air_dep, air_arr, airline) %>%
+  group_by(year, month) %>% 
+  mutate(id = sequence(n()),
+         time = paste0(year,"/", month))
+
+# creating group indices' variable
+dLBASE1c$group = dLBASE1c %>% group_indices(time)
+
+# transforming to panel data
+dLBASE1c = pdata.frame(dLBASE1c, index = c("id","time")) %>%
+  ungroup() %>% arrange(year, month)
+
+} # organizing LBASE1c
+
+{
+# organizing database
+dLBASE2 = LBASE2 %>% 
+  ungroup() %>%
+  arrange(year, month, air_dep, air_arr) %>%
+  group_by(year, month) %>% 
+  mutate(id = sequence(n()),
+         time = paste0(year,"/", month))
+
+# creating group indices' variable
+dLBASE2$group = dLBASE2 %>% group_indices(time)
+
+# transforming to panel data
+dLBASE2 = pdata.frame(dLBASE2, index = c("id","time")) %>%
+  ungroup() %>% arrange(year, month)
+
+} # organizing LBASE2
+
+{
+# organizing database
+dLBASE2c = LBASE2c %>% 
+  ungroup() %>%
+  arrange(year, month, air_dep, air_arr) %>%
+  group_by(year, month) %>% 
+  mutate(id = sequence(n()),
+         time = paste0(year,"/", month))
+
+# creating group indices' variable
+dLBASE2c$group = dLBASE2c %>% group_indices(time)
+
+# transforming to panel data
+dLBASE2c = pdata.frame(dLBASE2c, index = c("id","time")) %>%
+  ungroup() %>% arrange(year, month)
+
+} # organizing LBASE2c
+
 
 ```
 
