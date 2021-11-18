@@ -1,27 +1,33 @@
 ---
 author: João Ricardo Tonin
 date: '2021-11-15T17:42:34-03:00'
-draft: false
+draft: False
 output:
   md_document:
-    preserve_yaml: true
+    preserve_yaml: True
     variant: markdown
 title: 'Essay II: main results'
 ---
 
-    ## 
-    ##  Hausman Test
-    ## 
-    ## data:  IV
-    ## chisq = 32.114, df = 21, p-value = 0.05701
-    ## alternative hypothesis: one model is inconsistent
-
-    ## 
-    ##  Hausman Test
-    ## 
-    ## data:  IV
-    ## chisq = 34.642, df = 21, p-value = 0.0309
-    ## alternative hypothesis: one model is inconsistent
+  variable          first\_mean   first\_sd   normal\_mean   normal\_sd   second\_mean   second\_sd
+  --------------- ------------- ----------- -------------- ------------ -------------- ------------
+  0-5                      0.09        0.23           0.12         0.26           0.11         0.25
+  12-17                    0.38        0.39           0.36         0.35           0.38         0.38
+  18-23                    0.21        0.30           0.23         0.29           0.21         0.30
+  6-11                     0.31        0.35           0.29         0.30           0.30         0.34
+  aircraft               151.18       40.83         142.30        46.29         153.15        38.94
+  ArrHUB                   0.48        0.50           0.43         0.50           0.47         0.50
+  capital\_arr             0.73        0.44           0.68         0.47           0.72         0.45
+  capital\_dep             0.73        0.44           0.69         0.46           0.72         0.45
+  DepHUB                   0.48        0.50           0.43         0.50           0.47         0.50
+  flight\_hours            1.93        0.83           1.87         0.82           1.90         0.80
+  free\_luggage           15.32      105.83          20.03       184.04          13.70        46.83
+  hubling                  0.27        0.31           0.26         0.29           0.26         0.30
+  paid\_luggage            0.40        4.99           0.34         5.24           0.35         2.33
+  price                  418.04      208.52         506.69       216.55         471.82       231.07
+  RouteShare               0.70        0.32           0.66         0.34           0.72         0.32
+  take\_off               39.81       39.05          56.92        66.16          44.78        43.00
+  tx\_seat                 0.73        0.17           0.79         0.13           0.75         0.16
 
     ## 
     ## =========================================================================================================================

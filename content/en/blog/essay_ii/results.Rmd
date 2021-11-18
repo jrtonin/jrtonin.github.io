@@ -17,7 +17,8 @@ memory.limit(size = 999999999999)
 
 { 
   # Check if the packages that we need are installed
-  want = c("tidyverse", "plm", "texreg", "lmtest", "tibble")
+  want = c("tidyverse", "plm", "texreg", "lmtest", "tibble",
+           "gluedown", "stringr", "rvest", "kableExtra")
   have = want %in% rownames(installed.packages())
   # Install the packages that we miss
   if ( any(!have) ) { install.packages( want[!have] ) }
@@ -31,13 +32,62 @@ memory.limit(size = 999999999999)
 
 ```{r reading_databases, include=FALSE, echo=TRUE}
 
-# reading databases
+# reading log databases
 LBASE1 = readRDS(url("https://github.com/jrtonin/thesis_essay_ii/raw/main/data/LBASE1_Essay_II.rds"))
 LBASE1c = readRDS(url("https://github.com/jrtonin/thesis_essay_ii/raw/main/data/LBASE1c_Essay_II.rds"))
 LBASE2 = readRDS(url("https://github.com/jrtonin/thesis_essay_ii/raw/main/data/LBASE2_Essay_II.rds"))
 LBASE2c = readRDS(url("https://github.com/jrtonin/thesis_essay_ii/raw/main/data/LBASE2c_Essay_II.rds"))
 
+# read normal databases
+BASE1 = readRDS(url("https://github.com/jrtonin/thesis_data/raw/main/data/final/BASE1_Essay_II.rds"))
+BASE2 = readRDS(url("https://github.com/jrtonin/thesis_data/raw/main/data/final/BASE2_Essay_II.rds"))
+
 ```
+
+```{r sd_full, include=TRUE, echo=FALSE}
+
+## organizing database
+
+# applying mean operation
+sdfulla = BASE1 %>% ungroup() %>%
+  group_by(covid_wave) %>%
+  summarise(across(c(price, hubling, aircraft, flight_hours, take_off, RouteShare, tx_seat, 
+         free_luggage, paid_luggage, `0-5`, `6-11`, `12-17`, `18-23`, DepHUB,          
+         capital_dep, ArrHUB, capital_arr), ~ mean(.x, na.rm = TRUE))) %>%
+  mutate(covid_wave = case_when(covid_wave == "normal" ~ 1,
+                                covid_wave == "first" ~ 3,
+                                covid_wave == "second" ~ 5, TRUE ~ 0))
+
+# applying sd operation
+sdfullb = BASE1 %>% ungroup() %>%
+  group_by(covid_wave) %>%
+  summarise(across(c(price, hubling, aircraft, flight_hours, take_off, RouteShare, tx_seat, 
+         free_luggage, paid_luggage, `0-5`, `6-11`, `12-17`, `18-23`, DepHUB,          
+         capital_dep, ArrHUB, capital_arr), ~ sd(.x, na.rm = TRUE))) %>%
+  mutate(covid_wave = case_when(covid_wave == "normal" ~ 2,
+                                covid_wave == "first" ~ 4,
+                                covid_wave == "second" ~ 6, TRUE ~ 0))
+
+# merging mean and sd databases
+sdfull = sdfulla %>%
+  bind_rows(sdfullb) %>%
+  arrange(covid_wave) %>%
+  mutate(across(c(price, hubling, aircraft, flight_hours, take_off, RouteShare, tx_seat, 
+         free_luggage, paid_luggage, `0-5`, `6-11`, `12-17`, `18-23`, DepHUB,          
+         capital_dep, ArrHUB, capital_arr), ~ round(.x, 2))) %>%
+  mutate(covid_wave = case_when(covid_wave == 1 ~ "normal_mean",
+                                covid_wave == 2 ~ "normal_sd",
+                                covid_wave == 3 ~ "first_mean",
+                                covid_wave == 4 ~ "first_sd",
+                                covid_wave == 5 ~ "second_mean",
+                                covid_wave == 6 ~ "second_sd", TRUE ~ "erro")) %>%
+  gather(variable,value,price:capital_arr) %>%
+  spread(covid_wave,value)
+  
+print(sdfull)
+
+```
+
 
 ```{r databases, warning=FALSE, message=FALSE, error=FALSE, include=TRUE, echo = FALSE}
 
@@ -146,7 +196,7 @@ ecw1 = plm(IV, data = dLBASE1, model = "within")
 ecr1 = update(ecw1, model = "random", random.method = "nerlove", inst.method = "baltagi")
 
 # Hausman test
-phtest(ecw1, ecr1) # H1: one model is inconsistent - p_valor < 0,10 : within
+#phtest(ecw1, ecr1) # H1: one model is inconsistent - p_valor < 0,10 : within
 
 # ht2sls
 
@@ -158,7 +208,7 @@ ht1w = plm(IV, data = dLBASE1, model = "within",
            inst.method = "baltagi", random.method = "ht")
 
 # Hausman test
-phtest(ht1w, ht1r)
+#phtest(ht1w, ht1r)
 
 # gmm  
 gmm = pgmm(GMM, dLBASE1, model = "onestep", effect="individual")
