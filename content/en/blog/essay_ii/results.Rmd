@@ -1,5 +1,5 @@
 ---
-title: "Essay II: main results"
+title: "Essay II: What happened to the Brazilian airline market during the pandemic?"
 author: "João Ricardo Tonin"
 date: 2021-11-15T17:42:34-03:00
 draft: false
@@ -18,7 +18,7 @@ memory.limit(size = 999999999999)
 { 
   # Check if the packages that we need are installed
   want = c("tidyverse", "plm", "texreg", "lmtest", "tibble",
-           "gluedown", "stringr", "rvest", "kableExtra")
+           "gluedown", "stringr", "rvest", "kableExtra", "broom")
   have = want %in% rownames(installed.packages())
   # Install the packages that we miss
   if ( any(!have) ) { install.packages( want[!have] ) }
@@ -43,6 +43,77 @@ BASE1 = readRDS(url("https://github.com/jrtonin/thesis_data/raw/main/data/final/
 BASE2 = readRDS(url("https://github.com/jrtonin/thesis_data/raw/main/data/final/BASE2_Essay_II.rds"))
 
 ```
+
+### What is the Brazillian airline market estructure?
+
+```{r airline_market, include=FALSE, echo=TRUE}
+
+# summarizing number of routes
+nroutes = BASE1 %>%
+  group_by(air_dep, air_arr, covid_wave) %>%
+  dplyr::summarise(n = n()) %>%
+  group_by(covid_wave) %>%
+  dplyr::summarise(n = n()) %>%
+  spread(covid_wave, n) %>%
+  mutate(variable = "Number of routes") %>%
+  select(variable, normal, first, second)
+
+# summarizing number of competitors
+ncompetitors = BASE1 %>%
+  group_by(covid_wave, airline) %>%
+  dplyr::summarise(n = n()) %>%
+  group_by(covid_wave) %>%
+  dplyr::summarise(n = n()) %>%
+  spread(covid_wave, n) %>%
+  mutate(variable = "Number of competitors") %>%
+  select(variable, normal, first, second)
+
+# calculating passengers and takeoffs monthly realized
+nmarket = BASE1 %>%
+  group_by(covid_wave, year, month) %>%
+  dplyr::summarise(seat_dem = sum(seat_com),
+                   take_off = sum(take_off),
+                   seat_offer = sum(seat_offer)) %>%
+  group_by(covid_wave) %>%
+  dplyr::summarise(seat_dem = sum(seat_dem),
+                   take_off = sum(take_off),
+                   seat_offer = sum(seat_offer),
+                   n = n()) %>%
+  mutate(seat_dem = round(seat_dem/n, 0),
+         take_off = round(take_off/n, 0),
+         seat_offer = round(seat_offer/n, 0),
+         aircraft = round(seat_offer/take_off, 0),
+         seat_ocupation = round(seat_dem/seat_offer, 2)*100) %>%
+  select(seat_dem, take_off, aircraft, seat_ocupation, covid_wave) %>%
+  gather(variable, n, seat_dem:seat_ocupation) %>%
+  spread(covid_wave, n) %>%
+  mutate(id = case_when(variable == "seat_dem" ~ 1,
+                        variable == "seat_ocupation" ~ 2,
+                        variable == "take_off" ~ 3, 
+                        variable == "aircraft" ~ 4)) %>%
+  arrange(id) %>%
+  select(variable, normal, first, second)
+
+# merging final database
+final = nroutes %>% bind_rows(ncompetitors, nmarket) %>%
+  mutate(variable = case_when(variable == "aircraft" ~ "Aircraft size (number of seats)",
+                              variable == "seat_dem" ~ "Monthly seats sold average",
+                              variable == "seat_ocupation" ~ "Aircraft seats occupation average",
+                              variable == "take_off" ~ "Monthly takeoff average",
+                              TRUE ~ variable))
+  
+# printing final database
+print(final)
+
+```
+
+Main results found:
+* The number of routes and aircraft occupancy rate showed a downward trend during the two pandemic periods;
+* Three companies stopped operating during the pandemic;
+* The number of seats sold monthly dropped 61.68% during the first  Covid19 period and recovered 12.3% in the second moment;
+* The average aircraft size increased in the first Covid19 period and decreased again in the second wave, but remained higher than in the period before the pandemic.
+
+
 
 ```{r sd_full, include=TRUE, echo=FALSE}
 
@@ -82,12 +153,58 @@ sdfull = sdfulla %>%
                                 covid_wave == 5 ~ "second_mean",
                                 covid_wave == 6 ~ "second_sd", TRUE ~ "erro")) %>%
   gather(variable,value,price:capital_arr) %>%
-  spread(covid_wave,value)
+  spread(covid_wave,value) %>%
+  select(variable, normal_mean, normal_sd, first_mean, first_sd, second_mean, second_sd)
   
 print(sdfull)
 
 ```
 
+```{r sd_full_duopoly, include=TRUE, echo=FALSE}
+
+# applying mean operation
+sdfulla = BASE1 %>% ungroup() %>%
+  filter(N == 2) %>%
+  group_by(covid_wave, market) %>%
+  summarise(across(c(price, hubling, aircraft, flight_hours, take_off, RouteShare, tx_seat, 
+         free_luggage, paid_luggage, `0-5`, `6-11`, `12-17`, `18-23`, DepHUB,          
+         capital_dep, ArrHUB, capital_arr), ~ mean(.x, na.rm = TRUE))) %>%
+  mutate(covid_wave = case_when(covid_wave == "normal" ~ 1,
+                                covid_wave == "first" ~ 3,
+                                covid_wave == "second" ~ 5, TRUE ~ 0))
+
+
+# applying mean operation
+sdfulla = BASE1 %>% ungroup() %>%
+  filter(N == 2) %>%
+  select(year, month, air_dep, air_arr, market, covid_wave,
+         price, hubling, aircraft, flight_hours, take_off, RouteShare, tx_seat, 
+         free_luggage, paid_luggage, `0-5`, `6-11`, `12-17`, `18-23`) %>%
+  gather(variable, value, price:`18-23`) %>%
+  arrange(variable, market) %>% 
+  group_by(year, month, air_dep, air_arr, market, variable) %>%
+  mutate(id = sequence(n())) %>%
+  group_by(variable) %>%
+  spread(market, value) %>%
+  filter(variable == "price") %>%
+  group_by(year, month, covid_wave) %>%
+  dplyr::summarise(meanl = mean(lider),
+                   means = mean(seguidora)) %>%
+  mutate(diff = meanl - means)
+
+    
+  do(tidy(t.test(.$lider, 
+                 .$seguidora, 
+                 alt = "two.sided", 
+                 paired = TRUE)))
+  
+
+t.test(value ~ market, data = sdfulla, paired = TRUE)
+  
+
+
+
+```
 
 ```{r databases, warning=FALSE, message=FALSE, error=FALSE, include=TRUE, echo = FALSE}
 
@@ -218,4 +335,6 @@ screenreg(list(ols = ols, fe = fe, ivfe = ivfe, ecw1 = ecw1, ht1r = ht1r, gmm = 
                digits = 3, omit.coef = "(Intercept)")
 
 ```
+
+
 
