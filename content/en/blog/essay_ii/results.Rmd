@@ -10,7 +10,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 
 # define memory limit
 memory.limit(size = 999999999999)
@@ -44,9 +44,9 @@ BASE2 = readRDS(url("https://github.com/jrtonin/thesis_data/raw/main/data/final/
 
 ```
 
-### What is the Brazillian airline market estructure?
+#### I - What is the Brazillian airline market estructure?
 
-```{r airline_market, include=FALSE, echo=TRUE}
+```{r airline_market, include=TRUE, echo=FALSE}
 
 # summarizing number of routes
 nroutes = BASE1 %>%
@@ -103,19 +103,23 @@ final = nroutes %>% bind_rows(ncompetitors, nmarket) %>%
                               TRUE ~ variable))
   
 # printing final database
-print(final)
+kable(head(final))
 
 ```
 
 Main results found:
-* The number of routes and aircraft occupancy rate showed a downward trend during the two pandemic periods;
-* Three companies stopped operating during the pandemic;
-* The number of seats sold monthly dropped 61.68% during the first  Covid19 period and recovered 12.3% in the second moment;
-* The average aircraft size increased in the first Covid19 period and decreased again in the second wave, but remained higher than in the period before the pandemic.
+
+ * The number of routes and aircraft occupancy rate showed a downward trend during the two pandemic periods;
+ 
+ * Three companies stopped operating during the pandemic;
+ 
+ * The number of seats sold monthly dropped 61.68% during the first Covid19 period and recovered 12.3% in the second moment;
+ 
+ * The average aircraft size increased in the first Covid19 period and decreased again in the second wave, but remained higher than in the period before the pandemic.
 
 
 
-```{r sd_full, include=TRUE, echo=FALSE}
+```{r sd_full, include=FALSE, echo=FALSE}
 
 ## organizing database
 
@@ -160,7 +164,7 @@ print(sdfull)
 
 ```
 
-```{r sd_full_duopoly, include=TRUE, echo=FALSE}
+```{r sd_full_duopoly, include=FALSE, echo=FALSE}
 
 # applying mean operation
 sdfulla = BASE1 %>% ungroup() %>%
@@ -191,18 +195,6 @@ sdfulla = BASE1 %>% ungroup() %>%
   dplyr::summarise(meanl = mean(lider),
                    means = mean(seguidora)) %>%
   mutate(diff = meanl - means)
-
-    
-  do(tidy(t.test(.$lider, 
-                 .$seguidora, 
-                 alt = "two.sided", 
-                 paired = TRUE)))
-  
-
-t.test(value ~ market, data = sdfulla, paired = TRUE)
-  
-
-
 
 ```
 
@@ -283,7 +275,7 @@ dLBASE2c = pdata.frame(dLBASE2c, index = c("id","time")) %>%
 
 ```
 
-```{r base1, include = TRUE, echo = FALSE}
+```{r base1, include = FALSE, echo = FALSE}
 
 # dummies | Tourist | N | market | covid | covid_wave | quarter | airline
 # arrival dummies | ArrHUB | market_arr | region_arr | capital_arr 

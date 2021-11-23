@@ -6,92 +6,128 @@ output:
   md_document:
     preserve_yaml: True
     variant: markdown
-title: 'Essay II: main results'
+title: |
+    Essay II: What happened to the Brazilian airline market during the
+    pandemic?
 ---
 
-    ## # A tibble: 17 x 7
-    ##    variable     first_mean first_sd normal_mean normal_sd second_mean second_sd
-    ##    <chr>             <dbl>    <dbl>       <dbl>     <dbl>       <dbl>     <dbl>
-    ##  1 0-5                0.09     0.23        0.12      0.26        0.11      0.25
-    ##  2 12-17              0.38     0.39        0.36      0.35        0.38      0.38
-    ##  3 18-23              0.21     0.3         0.23      0.29        0.21      0.3 
-    ##  4 6-11               0.31     0.35        0.29      0.3         0.3       0.34
-    ##  5 aircraft         151.      40.8       142.       46.3       153.       38.9 
-    ##  6 ArrHUB             0.48     0.5         0.43      0.5         0.47      0.5 
-    ##  7 capital_arr        0.73     0.44        0.68      0.47        0.72      0.45
-    ##  8 capital_dep        0.73     0.44        0.69      0.46        0.72      0.45
-    ##  9 DepHUB             0.48     0.5         0.43      0.5         0.47      0.5 
-    ## 10 flight_hours       1.93     0.83        1.87      0.82        1.9       0.8 
-    ## 11 free_luggage      15.3    106.         20.0     184.         13.7      46.8 
-    ## 12 hubling            0.27     0.31        0.26      0.29        0.26      0.3 
-    ## 13 paid_luggage       0.4      4.99        0.34      5.24        0.35      2.33
-    ## 14 price            418.     209.        507.      217.        472.      231.  
-    ## 15 RouteShare         0.7      0.32        0.66      0.34        0.72      0.32
-    ## 16 take_off          39.8     39.0        56.9      66.2        44.8      43   
-    ## 17 tx_seat            0.73     0.17        0.79      0.13        0.75      0.16
+#### I - What is the Brazillian airline market estructure?
 
-    ## 
-    ## =========================================================================================================================
-    ##                                  ols            fe             ivfe           ecw1           ht1r           gmm          
-    ## -------------------------------------------------------------------------------------------------------------------------
-    ## hubling                              0.009 ***      0.009 ***      0.017 ***      0.017 ***      0.017 ***      0.011 ***
-    ##                                     (0.001)        (0.001)        (0.001)        (0.001)        (0.001)        (0.001)   
-    ## aircraft                            -0.070 ***     -0.063 ***     -0.058 ***     -0.058 ***     -0.059 ***     -0.098 ***
-    ##                                     (0.004)        (0.004)        (0.004)        (0.004)        (0.004)        (0.008)   
-    ## flight_hours                         0.876 ***      0.869 ***      0.906 ***      0.906 ***      0.906 ***      0.891 ***
-    ##                                     (0.008)        (0.008)        (0.009)        (0.009)        (0.009)        (0.014)   
-    ## connection                           0.005         -0.013 ***     -0.016 ***     -0.016 ***     -0.013 ***     -0.023 ** 
-    ##                                     (0.003)        (0.003)        (0.003)        (0.003)        (0.003)        (0.008)   
-    ## X6.11                                0.036 ***      0.068 ***      0.052 ***      0.052 ***      0.048 ***      0.066 ***
-    ##                                     (0.010)        (0.010)        (0.010)        (0.010)        (0.010)        (0.014)   
-    ## X12.17                               0.054 ***      0.070 ***      0.072 ***      0.072 ***      0.071 ***      0.034 *  
-    ##                                     (0.009)        (0.009)        (0.010)        (0.010)        (0.009)        (0.014)   
-    ## X18.23                               0.027 **       0.042 ***      0.051 ***      0.051 ***      0.050 ***      0.038 *  
-    ##                                     (0.010)        (0.010)        (0.011)        (0.011)        (0.011)        (0.015)   
-    ## RouteShare                          -0.018 ***     -0.018 ***      0.189 ***      0.189 ***      0.189 ***      0.043 ***
-    ##                                     (0.003)        (0.003)        (0.013)        (0.013)        (0.012)        (0.004)   
-    ## factor(Tourist)TRUE                 -0.008          0.002          0.020 ***      0.020 ***      0.018 **                
-    ##                                     (0.005)        (0.005)        (0.006)        (0.006)        (0.006)                  
-    ## factor(N)2                          -0.147 ***     -0.122 ***      0.058 ***      0.058 ***      0.055 ***               
-    ##                                     (0.006)        (0.006)        (0.012)        (0.012)        (0.012)                  
-    ## factor(N)3                          -0.279 ***     -0.246 ***      0.038 *        0.038 *        0.034                   
-    ##                                     (0.008)        (0.008)        (0.019)        (0.019)        (0.019)                  
-    ## factor(N)4                          -0.302 ***     -0.258 ***      0.118 ***      0.118 ***      0.111 ***               
-    ##                                     (0.016)        (0.016)        (0.028)        (0.028)        (0.028)                  
-    ## factor(N)5                          -0.413 ***     -0.451 ***      0.101          0.101          0.104                   
-    ##                                     (0.072)        (0.073)        (0.085)        (0.085)        (0.084)                  
-    ## factor(covid)TRUE                   -0.243 ***     -0.557 ***     -0.534 ***     -0.534 ***     -0.249 ***               
-    ##                                     (0.005)        (0.121)        (0.131)        (0.131)        (0.014)                  
-    ## factor(covid_wave)second             0.144 ***      0.119          0.121          0.121          0.148 ***               
-    ##                                     (0.007)        (0.141)        (0.152)        (0.152)        (0.021)                  
-    ## factor(quarter)II                   -0.008          0.003         -0.011         -0.011         -0.010                   
-    ##                                     (0.006)        (0.069)        (0.074)        (0.074)        (0.018)                  
-    ## factor(quarter)III                   0.059 ***      0.098          0.084          0.084          0.057 ***               
-    ##                                     (0.006)        (0.084)        (0.091)        (0.091)        (0.017)                  
-    ## factor(quarter)IV                    0.094 ***      0.181 **       0.189 **       0.189 **       0.099 ***               
-    ##                                     (0.005)        (0.066)        (0.071)        (0.071)        (0.015)                  
-    ## factor(ArrHUB)TRUE                  -0.026 ***     -0.031 ***     -0.040 ***     -0.040 ***     -0.039 ***               
-    ##                                     (0.005)        (0.005)        (0.005)        (0.005)        (0.005)                  
-    ## factor(market_arr)seguidora          0.007          0.001          0.055 ***      0.055 ***      0.056 ***               
-    ##                                     (0.004)        (0.004)        (0.005)        (0.005)        (0.005)                  
-    ## factor(capital_arr)TRUE             -0.037 ***     -0.034 ***     -0.057 ***     -0.057 ***     -0.057 ***               
-    ##                                     (0.005)        (0.005)        (0.006)        (0.006)        (0.005)                  
-    ## lag(price)                                                                                                      0.139 ***
-    ##                                                                                                                (0.008)   
-    ## -------------------------------------------------------------------------------------------------------------------------
-    ## R^2                                  0.368          0.339          0.252          0.252          0.257                   
-    ## Adj. R^2                             0.368          0.311          0.221          0.221          0.257                   
-    ## Num. obs.                        31203          31203          31203          31203          31203          31203        
-    ## s_idios                                                                                          0.361                   
-    ## s_id                                                                                             0.171                   
-    ## n                                                                                                            1236        
-    ## T                                                                                                              35        
-    ## Num. obs. used                                                                                              25879        
-    ## Sargan Test: chisq                                                                                            661.826    
-    ## Sargan Test: df                                                                                               586.000    
-    ## Sargan Test: p-value                                                                                            0.016    
-    ## Wald Test Coefficients: chisq                                                                                4873.297    
-    ## Wald Test Coefficients: df                                                                                      9        
-    ## Wald Test Coefficients: p-value                                                                                 0.000    
-    ## =========================================================================================================================
-    ## *** p < 0.001; ** p < 0.01; * p < 0.05
+<table>
+<thead>
+<tr>
+<th style="text-align:left;">
+variable
+</th>
+<th style="text-align:right;">
+normal
+</th>
+<th style="text-align:right;">
+first
+</th>
+<th style="text-align:right;">
+second
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+Number of routes
+</td>
+<td style="text-align:right;">
+1145
+</td>
+<td style="text-align:right;">
+885
+</td>
+<td style="text-align:right;">
+718
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Number of competitors
+</td>
+<td style="text-align:right;">
+8
+</td>
+<td style="text-align:right;">
+5
+</td>
+<td style="text-align:right;">
+5
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Monthly seats sold average
+</td>
+<td style="text-align:right;">
+5657330
+</td>
+<td style="text-align:right;">
+2167448
+</td>
+<td style="text-align:right;">
+2853945
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Aircraft seats occupation average
+</td>
+<td style="text-align:right;">
+59
+</td>
+<td style="text-align:right;">
+55
+</td>
+<td style="text-align:right;">
+54
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Monthly takeoff average
+</td>
+<td style="text-align:right;">
+63047
+</td>
+<td style="text-align:right;">
+25720
+</td>
+<td style="text-align:right;">
+34491
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Aircraft size (number of seats)
+</td>
+<td style="text-align:right;">
+152
+</td>
+<td style="text-align:right;">
+154
+</td>
+<td style="text-align:right;">
+153
+</td>
+</tr>
+</tbody>
+</table>
+
+Main results found:
+
+-   The number of routes and aircraft occupancy rate showed a downward
+    trend during the two pandemic periods;
+
+-   Three companies stopped operating during the pandemic;
+
+-   The number of seats sold monthly dropped 61.68% during the first
+    Covid19 period and recovered 12.3% in the second moment;
+
+-   The average aircraft size increased in the first Covid19 period and
+    decreased again in the second wave, but remained higher than in the
+    period before the pandemic.
