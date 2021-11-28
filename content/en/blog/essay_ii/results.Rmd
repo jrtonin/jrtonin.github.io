@@ -360,6 +360,34 @@ Main results found:
  * During a pandemic, airports in the North and Northeast regions increased their market share in terms of both the number of routes and the volume of tickets sold;
  
  * The Southeast region had an increase in share in departure routes while the South region was the most affected, lost share both in departure and arrival points.
+ 
+#### V - Did the pandemic change passenger boarding times at Brazilian airports?
+
+```{r schedulle, include=TRUE, echo=FALSE}
+
+# organizing database
+schedulle = BASE1 %>%
+  select(covid_wave, `0-5`, `6-11`, `12-17`, `18-23`) %>%
+  gather(schedulle, departure, `0-5`:`18-23`) %>%
+  group_by(covid_wave, schedulle) %>%
+  dplyr::summarise(departure = mean(departure)) %>%
+  spread(schedulle, departure) %>%
+  mutate(id = case_when(covid_wave == "normal" ~ 1,
+                        covid_wave == "first" ~ 2, 
+                        TRUE ~ 3)) %>%
+  mutate(across(c(`0-5`, `6-11`, `12-17`, `18-23`), ~ round(.x*100, 2))) %>%
+  arrange(id) %>%
+  select(-id)
+
+# printing final database
+kable(head(schedulle, n = 3L))
+
+```
+
+Main results found:
+
+ * 
+
 
 ```{r sd_full, include=FALSE, echo=FALSE}
 
