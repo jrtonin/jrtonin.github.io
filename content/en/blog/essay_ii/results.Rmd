@@ -143,7 +143,8 @@ nroutes = BASE1 %>%
          var_3 =  round((oligopoly/(dplyr::lag(oligopoly))-1)*100, 2),
          var_4 =  round((total/(dplyr::lag(total))-1)*100, 2)) %>%
   select(covid_wave, single, var_1, duopoly, var_2, oligopoly, var_3, total, var_4) %>%
-  mutate(across(everything(), ~ replace_na(., 0))) 
+  mutate(across(everything(), ~ replace_na(., 0)),
+         variable = "Number of routes")  
 
 # calculation share of seats sold by type of market
 nseats = BASE1 %>%
@@ -169,7 +170,8 @@ nseats = BASE1 %>%
          var_3 =  round((oligopoly - (dplyr::lag(oligopoly))), 2),
          var_4 =  round((total - (dplyr::lag(total))), 2)) %>%
   select(covid_wave, single, var_1, duopoly, var_2, oligopoly, var_3, total, var_4) %>%
-  mutate(across(everything(), ~ replace_na(., 0))) 
+  mutate(across(everything(), ~ replace_na(., 0)),
+         variable = "seats sold (share by market - in %")
   
 # calculation share of takeoff performed by type of market
 ntakeoff = BASE1 %>%
@@ -195,7 +197,8 @@ ntakeoff = BASE1 %>%
          var_3 =  round((oligopoly - (dplyr::lag(oligopoly))), 2),
          var_4 =  round((total - (dplyr::lag(total))), 2)) %>%
   select(covid_wave, single, var_1, duopoly, var_2, oligopoly, var_3, total, var_4) %>%
-  mutate(across(everything(), ~ replace_na(., 0))) 
+  mutate(across(everything(), ~ replace_na(., 0)),
+         variable = "Takeoffs (share by market - in %") 
 
 # calculation average distance by type of market
 ndistance = BASE1 %>%
@@ -226,9 +229,57 @@ ndistance = BASE1 %>%
          var_3 =  round((oligopoly/(dplyr::lag(oligopoly))-1)*100, 2),
          var_4 =  round((total/(dplyr::lag(total))-1)*100, 2)) %>%
   select(covid_wave, single, var_1, duopoly, var_2, oligopoly, var_3, total, var_4) %>%
-  mutate(across(everything(), ~ replace_na(., 0))) 
+  mutate(across(everything(), ~ replace_na(., 0)),
+         variable = "Average distance (in km)") 
+
+# calculation average prices by type of market
+nprices = BASE1 %>%
+  mutate(competition = case_when(N == 1 ~ "single",
+                                 N == 2 ~ "duopoly",
+                                 TRUE ~ "oligopoly")) %>%
+  group_by(competition, covid_wave) %>%
+  dplyr::summarise(seats = sum(seat_dem), 
+                   revenue = sum(revenue)) %>% 
+  bind_rows(BASE1 %>% ungroup() %>%
+              group_by(covid_wave) %>%
+              dplyr::summarise(seats = sum(seat_dem),
+                               revenue = sum(revenue),
+                               competition = "total")) %>%
+  mutate(prices = round(revenue/seats, 0)) %>%
+  select(-revenue, -seats) %>%
+  spread(competition, prices) %>%
+  mutate(id = case_when(covid_wave == "normal" ~ 1,
+                        covid_wave == "first" ~ 2, 
+                        TRUE ~ 3)) %>%
+  arrange(id) %>%
+  select(covid_wave, single, duopoly, oligopoly, total) %>%
+  mutate(var_1 =  round((single/(dplyr::lag(single))-1)*100, 2),
+         var_2 =  round((duopoly/(dplyr::lag(duopoly))-1)*100, 2),
+         var_3 =  round((oligopoly/(dplyr::lag(oligopoly))-1)*100, 2),
+         var_4 =  round((total/(dplyr::lag(total))-1)*100, 2)) %>%
+  select(covid_wave, single, var_1, duopoly, var_2, oligopoly, var_3, total, var_4) %>%
+  mutate(across(everything(), ~ replace_na(., 0)),
+         variable = "Average prices (in R$)") 
+
+# editing final database
+dcompetition = nroutes %>%
+  bind_rows(nprices, nseats, ntakeoff, ndistance) %>%
+  select(variable, covid_wave, single, var_1, duopoly, var_2, oligopoly, var_3, total, var_4)
+
+# printing final database
+kable(head(dcompetition))
 
 ```
+
+Main results found:
+
+ * The number of routes served by Brazilian commercial aviation decreased during the pandemic period, mainly in oligopolistic markets;
+ 
+ * Fares fell in Covid19's first phase, but returned to a level higher than pre-pandemic in the second phase;
+ 
+ * In the first stage of Covid19, the number of companies operating on the same route decreased causing the oligopolized routes to become duopoly or monopoly, in the second stage the monopolies continued to grow while part of the duopolies became oligopolies;
+ 
+ * During the pandemic, routes with only one company operating had an increase in average distance, while oligopolist routes has the opposite effect.
 
 
 ```{r sd_full, include=FALSE, echo=FALSE}
