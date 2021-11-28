@@ -171,6 +171,62 @@ nseats = BASE1 %>%
   select(covid_wave, single, var_1, duopoly, var_2, oligopoly, var_3, total, var_4) %>%
   mutate(across(everything(), ~ replace_na(., 0))) 
   
+# calculation share of takeoff performed by type of market
+ntakeoff = BASE1 %>%
+  mutate(competition = case_when(N == 1 ~ "single",
+                                 N == 2 ~ "duopoly",
+                                 TRUE ~ "oligopoly")) %>%
+  select(take_off, competition, covid_wave) %>%
+  group_by(competition, covid_wave) %>%
+  summarise(take_off = sum(take_off)) %>%
+  spread(competition, take_off) %>%
+  mutate(id = case_when(covid_wave == "normal" ~ 1,
+                        covid_wave == "first" ~ 2, 
+                        TRUE ~ 3)) %>%
+  arrange(id) %>%
+  select(covid_wave, single, duopoly, oligopoly) %>%
+  mutate(total = single + duopoly + oligopoly) %>%
+  mutate(single = round((single/total)*100, 2),
+         duopoly = round((duopoly/total)*100, 2),
+         oligopoly = round((oligopoly/total)*100, 2),
+         total = 100) %>%
+  mutate(var_1 =  round((single - (dplyr::lag(single))), 2),
+         var_2 =  round((duopoly - (dplyr::lag(duopoly))), 2),
+         var_3 =  round((oligopoly - (dplyr::lag(oligopoly))), 2),
+         var_4 =  round((total - (dplyr::lag(total))), 2)) %>%
+  select(covid_wave, single, var_1, duopoly, var_2, oligopoly, var_3, total, var_4) %>%
+  mutate(across(everything(), ~ replace_na(., 0))) 
+
+# calculation average distance by type of market
+ndistance = BASE1 %>%
+  mutate(competition = case_when(N == 1 ~ "single",
+                                 N == 2 ~ "duopoly",
+                                 TRUE ~ "oligopoly")) %>%
+  group_by(competition, air_dep, air_arr, covid_wave) %>%
+  dplyr::summarise(n = n(), 
+                   distance = sum(distance)) %>%
+  group_by(competition, covid_wave) %>%
+  dplyr::summarise(n = sum(n),
+                   distance = sum(distance)) %>% 
+  bind_rows(BASE1 %>% ungroup() %>%
+              group_by(covid_wave) %>%
+              dplyr::summarise(n = n(),
+                               distance = sum(distance),
+                               competition = "total")) %>%
+  mutate(distance = round(distance/n, 0)) %>%
+  select(-n) %>%
+  spread(competition, distance) %>%
+  mutate(id = case_when(covid_wave == "normal" ~ 1,
+                        covid_wave == "first" ~ 2, 
+                        TRUE ~ 3)) %>%
+  arrange(id) %>%
+  select(covid_wave, single, duopoly, oligopoly, total) %>%
+  mutate(var_1 =  round((single/(dplyr::lag(single))-1)*100, 2),
+         var_2 =  round((duopoly/(dplyr::lag(duopoly))-1)*100, 2),
+         var_3 =  round((oligopoly/(dplyr::lag(oligopoly))-1)*100, 2),
+         var_4 =  round((total/(dplyr::lag(total))-1)*100, 2)) %>%
+  select(covid_wave, single, var_1, duopoly, var_2, oligopoly, var_3, total, var_4) %>%
+  mutate(across(everything(), ~ replace_na(., 0))) 
 
 ```
 
