@@ -171,7 +171,7 @@ nseats = BASE1 %>%
          var_4 =  round((total - (dplyr::lag(total))), 2)) %>%
   select(covid_wave, single, var_1, duopoly, var_2, oligopoly, var_3, total, var_4) %>%
   mutate(across(everything(), ~ replace_na(., 0)),
-         variable = "seats sold (share by market - in %")
+         variable = "seats sold (share %)")
   
 # calculation share of takeoff performed by type of market
 ntakeoff = BASE1 %>%
@@ -198,7 +198,7 @@ ntakeoff = BASE1 %>%
          var_4 =  round((total - (dplyr::lag(total))), 2)) %>%
   select(covid_wave, single, var_1, duopoly, var_2, oligopoly, var_3, total, var_4) %>%
   mutate(across(everything(), ~ replace_na(., 0)),
-         variable = "Takeoffs (share by market - in %") 
+         variable = "Takeoffs (share %)") 
 
 # calculation average distance by type of market
 ndistance = BASE1 %>%
@@ -230,7 +230,7 @@ ndistance = BASE1 %>%
          var_4 =  round((total/(dplyr::lag(total))-1)*100, 2)) %>%
   select(covid_wave, single, var_1, duopoly, var_2, oligopoly, var_3, total, var_4) %>%
   mutate(across(everything(), ~ replace_na(., 0)),
-         variable = "Average distance (in km)") 
+         variable = "Average distance") 
 
 # calculation average prices by type of market
 nprices = BASE1 %>%
@@ -259,15 +259,17 @@ nprices = BASE1 %>%
          var_4 =  round((total/(dplyr::lag(total))-1)*100, 2)) %>%
   select(covid_wave, single, var_1, duopoly, var_2, oligopoly, var_3, total, var_4) %>%
   mutate(across(everything(), ~ replace_na(., 0)),
-         variable = "Average prices (in R$)") 
+         variable = "Average prices") 
 
 # editing final database
 dcompetition = nroutes %>%
   bind_rows(nprices, nseats, ntakeoff, ndistance) %>%
-  select(variable, covid_wave, single, var_1, duopoly, var_2, oligopoly, var_3, total, var_4)
+  mutate(across(c(single, duopoly, oligopoly), as.double)) %>%
+  select(variable, covid_wave, single, var_1, duopoly, var_2, oligopoly, var_3, total, var_4) %>%
+  mutate(across(c(single, var_1, duopoly, var_2, oligopoly, var_3, total, var_4), ~ round(.x, 1)))
 
 # printing final database
-kable(head(dcompetition))
+kable(head(dcompetition, n = 15L)) 
 
 ```
 
@@ -281,6 +283,83 @@ Main results found:
  
  * During the pandemic, routes with only one company operating had an increase in average distance, while oligopolist routes has the opposite effect.
 
+
+#### III - How did Brazilian commercial aviation behave regionally in the pandemic?
+
+```{r regional, include=TRUE, echo=FALSE}
+
+# organizing arrival database
+darrival = BASE1 %>%
+  mutate(region_arr = case_when(air_arr == "SBTC" ~ "Nordeste", TRUE ~ region_arr),
+         region_dep = case_when(air_dep == "SBTC" ~ "Nordeste", TRUE ~ region_dep)) %>%
+  group_by(air_dep, air_arr, covid_wave, region_arr) %>%
+  dplyr::summarise(n = n(),
+                   seats = sum(seat_com)) %>%
+  mutate(region_arr = case_when(region_arr == "Nordeste" ~ "a_NE",
+                                region_arr == "Centro Oeste" ~ "a_MW",
+                                region_arr == "Sul" ~ "a_S",
+                                region_arr == "Sudeste" ~ "a_SE",
+                                region_arr == "Norte" ~ "a_N", TRUE ~ "ERROR")) %>%
+  group_by(covid_wave, region_arr) %>%
+  dplyr::summarise(routes = n(),
+                   seats = sum(seats)) %>%
+  gather(variable, result, routes, seats) %>%
+  spread(region_arr, result) %>%
+  mutate(id = case_when(covid_wave == "normal" & variable == "routes" ~ 1, 
+                        covid_wave == "normal" & variable == "seats" ~ 4,
+                        covid_wave == "first" & variable == "routes" ~ 2,
+                        covid_wave == "first" & variable == "seats" ~ 5,
+                        covid_wave == "second" & variable == "routes" ~ 3,
+                        covid_wave == "second" & variable == "seats" ~ 6,
+                        TRUE ~ 7)) %>%
+  arrange(id) %>%
+  mutate(total = a_NE + a_MW + a_SE + a_S + a_N) %>%
+  mutate(across(c(a_NE, a_MW, a_SE, a_S, a_N), ~ round((.x/total)*100, 2))) %>%
+  select(-total, -id)
+
+# organizing departure database
+ddeparture = BASE1 %>%
+  mutate(region_arr = case_when(air_arr == "SBTC" ~ "Nordeste", TRUE ~ region_arr),
+         region_dep = case_when(air_dep == "SBTC" ~ "Nordeste", TRUE ~ region_dep)) %>%
+  group_by(air_dep, air_arr, covid_wave, region_dep) %>%
+  dplyr::summarise(n = n(),
+                   seats = sum(seat_com)) %>%
+  mutate(region_dep = case_when(region_dep == "Nordeste" ~ "d_NE",
+                                region_dep == "Centro Oeste" ~ "d_MW",
+                                region_dep == "Sul" ~ "d_S",
+                                region_dep == "Sudeste" ~ "d_SE",
+                                region_dep == "Norte" ~ "d_N", TRUE ~ "ERROR")) %>%
+  group_by(covid_wave, region_dep) %>%
+  dplyr::summarise(routes = n(),
+                   seats = sum(seats)) %>%
+  gather(variable, result, routes, seats) %>%
+  spread(region_dep, result) %>%
+  mutate(id = case_when(covid_wave == "normal" & variable == "routes" ~ 1, 
+                        covid_wave == "normal" & variable == "seats" ~ 4,
+                        covid_wave == "first" & variable == "routes" ~ 2,
+                        covid_wave == "first" & variable == "seats" ~ 5,
+                        covid_wave == "second" & variable == "routes" ~ 3,
+                        covid_wave == "second" & variable == "seats" ~ 6,
+                        TRUE ~ 7)) %>%
+  arrange(id) %>%
+  mutate(total = d_NE + d_MW + d_SE + d_S + d_N) %>%
+  mutate(across(c(d_NE, d_MW, d_SE, d_S, d_N), ~ round((.x/total)*100, 2))) %>%
+  select(-total, -id) 
+
+# organizing final database
+region = darrival %>%
+  left_join(ddeparture, by = c("covid_wave", "variable"))
+
+# printing final database
+kable(head(region, n = 6L)) 
+
+```
+
+Main results found:
+
+ * During a pandemic, airports in the North and Northeast regions increased their market share in terms of both the number of routes and the volume of tickets sold;
+ 
+ * The Southeast region had an increase in share in departure routes while the South region was the most affected, lost share both in departure and arrival points.
 
 ```{r sd_full, include=FALSE, echo=FALSE}
 
