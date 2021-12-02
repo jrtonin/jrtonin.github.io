@@ -387,6 +387,71 @@ kable(head(schedulle, n = 3L))
 Main results found:
 
  * 
+ 
+ 
+```{r competitors_I, include=TRUE, echo=FALSE}
+
+# organizing database
+cprice = BASE1 %>%
+  mutate(competition = case_when(N == 1 ~ "single",
+                                 N == 2 ~ "duopoly",
+                                 TRUE ~ "oligopoly")) %>%
+  mutate(airline = case_when(airline == "AZU" ~ "AZU",
+                                 airline == "GLO" ~ "GLO",
+                                 airline == "TAM" ~ "TAM",
+                                 TRUE ~ "OUT")) %>%
+  group_by(airline, covid_wave, competition) %>%
+  summarise(demand = sum(seat_dem),
+            revenue = sum(revenue),
+            take_off = sum(take_off),
+            seat_offer = sum(seat_offer)) %>%
+  bind_rows(BASE1 %>%
+  mutate(airline = case_when(airline == "AZU" ~ "AZU",
+                                 airline == "GLO" ~ "GLO",
+                                 airline == "TAM" ~ "TAM",
+                                 TRUE ~ "OUT")) %>%            
+  mutate(competition = "total") %>%
+  group_by(airline, covid_wave, competition) %>%
+  summarise(demand = sum(seat_dem),
+            revenue = sum(revenue),
+            take_off = sum(take_off),
+            seat_offer = sum(seat_offer))) %>%
+  mutate(price = revenue/demand,
+         aircraft = seat_offer/take_off) %>%
+  select(airline, covid_wave, competition, take_off, price, aircraft, demand) %>%
+  gather(variable, value, take_off:demand) %>%
+  spread(competition, value) %>%
+  mutate(across(c(duopoly, oligopoly, single, total),  as.double)) %>%
+  mutate(duopoly = case_when(variable %in% c("demand", "take_off") ~ (duopoly/total)*100, TRUE ~ duopoly),
+         oligopoly = case_when(variable %in% c("demand", "take_off") ~ (oligopoly/total)*100, 
+                               TRUE ~ oligopoly),
+         single = case_when(variable %in% c("demand", "take_off") ~ (single/total)*100, TRUE ~ single),
+         total = case_when(variable %in% c("demand", "take_off") ~ (total/total)*100, TRUE ~ total)) %>%
+  mutate(across(c(duopoly, oligopoly, single, total), ~ round(.x, 2))) %>%
+  mutate(id = case_when(covid_wave == "normal" ~ 1,
+                        covid_wave == "first" ~ 2, 
+                        TRUE ~ 3)) %>%
+  arrange(airline, id) %>%
+  select(-id) %>%
+  gather(market, value, duopoly:total) %>%
+  mutate(market = case_when(market == "duopoly" ~ "b.duo", 
+                            market == "oligopoly" ~ "c.oli", 
+                            market == "single" ~ "a.sin", 
+                            TRUE ~ "d.tot")) %>%
+  mutate(id = paste0(airline,"-", market)) %>% ungroup() %>%
+  select(-airline, -market) %>%
+  spread(id, value) %>%
+  mutate(id = case_when(covid_wave == "normal" ~ 1,
+                        covid_wave == "first" ~ 2, 
+                        TRUE ~ 3)) %>%
+  arrange(variable, id) %>%
+  select(-id)
+
+# printing final database
+kable(head(cprice, n = 12L))
+
+```
+ 
 
 
 ```{r sd_full, include=FALSE, echo=FALSE}
