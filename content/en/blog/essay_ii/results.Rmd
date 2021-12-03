@@ -452,6 +452,66 @@ kable(head(cprice, n = 12L))
 
 ```
  
+Main results found:
+
+ * 
+ 
+```{r competitors_II, include=TRUE, echo=FALSE}
+
+# organizing database
+dcompetition = BASE1 %>%
+  filter(N >= 2)  %>%
+  mutate(position = market,
+         market = case_when(N == 2 ~ "duopoly", TRUE ~ "oligopoly")) %>%
+  mutate(airline = case_when(airline %in% c("GLO", "AZU", "TAM") ~ airline, TRUE ~ "OUT")) %>%
+  mutate(position = case_when(position == "lider" ~ airline, TRUE ~ position)) %>%
+  group_by(covid_wave, market, position) %>%
+  dplyr::summarise(demand = sum(seat_dem),
+                   revenue = sum(revenue),
+                   take_off = sum(take_off),
+                   seat_offer = sum(seat_offer))
+
+# selecting routes that GLO was the leader competitor
+GLO = BASE1 %>%
+  filter(N >= 2) %>%
+  mutate(code = paste0(month, "-", year, "-", air_dep, "-", air_arr)) %>%
+  filter(market == "lider" & airline == "GLO") %>%
+  group_by(code) %>%
+  dplyr::summarise(n = n()) %>% 
+  select(-n)
+
+# generating GLO vector
+GLO = as.vector(GLO$code) 
+
+# filtering GLO vector into BASE1
+GLOc = BASE1 %>%
+  arrange(year, month, air_dep, air_arr) %>%
+  mutate(code = paste0(month, "-", year, "-", air_dep, "-", air_arr)) %>%
+  filter(code %in% GLO) %>% 
+  mutate(position = market,
+         market = case_when(N == 2 ~ "duopoly", TRUE ~ "oligopoly")) %>%
+  group_by(covid_wave, market, position, code) %>%
+  dplyr::summarise(demand = sum(seat_dem),
+                   revenue = sum(revenue),
+                   take_off = sum(take_off),
+                   seat_offer = sum(seat_offer)) %>%
+  mutate(price = revenue/demand, 
+         aircraft = seat_offer/take_off) %>%
+  select(-demand, -revenue, -take_off, -seat_offer) %>%
+  gather(variable, value, price:aircraft) %>%
+  spread(variable, value) %>%
+  arrange(position, covid_wave, desc(market), code) %>%
+  group_by(position, covid_wave, market) %>% 
+  mutate(id = sequence(n()))
+
+
+
+
+
+```
+
+
+
 
 
 ```{r sd_full, include=FALSE, echo=FALSE}
