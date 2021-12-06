@@ -504,9 +504,29 @@ GLOc = BASE1 %>%
   group_by(position, covid_wave, market) %>% 
   mutate(id = sequence(n()))
 
+set.seed(123)
+df <- tibble(
+  ID = 1:20,
+  testA_wave1 = round(rnorm(20, 5, 3), 0),
+  testA_wave2 = round(rnorm(20, 5, 3), 0),
+  testA_wave3 = round(rnorm(20, 5, 3), 0),
+  testB_wave1 = round(rnorm(20, 5, 3), 0),
+  testB_wave2 = round(rnorm(20, 5, 3), 0),
+  testB_wave3 = round(rnorm(20, 5, 3), 0)
+)
 
-
-
+teste = df %>%
+ gather(variable, value, -ID) %>%
+ mutate(wave_ID = paste0("wave", parse_number(variable)),
+        variable = ifelse(grepl("testA", variable), "testA",
+                     ifelse(grepl("testB", variable), "testB", NA_character_))) %>%
+ group_by(wave_ID, variable) %>% 
+ summarise(value = list(value)) %>% 
+ spread(wave_ID, value) %>%
+ group_by(variable) %>%  
+ mutate(p_value_w1w2 = t.test(unlist(wave1), unlist(wave2), paired = TRUE)$p.value,
+        p_value_w1w3 = t.test(unlist(wave1), unlist(wave3), paired = TRUE)$p.value) 
+ select(variable, matches("(p_value)"))
 
 
 
