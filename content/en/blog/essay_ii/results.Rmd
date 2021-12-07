@@ -458,23 +458,11 @@ Main results found:
  
 ```{r competitors_II, include=TRUE, echo=FALSE}
 
-# organizing database
-dcompetition = BASE1 %>%
-  filter(N >= 2)  %>%
-  mutate(position = market,
-         market = case_when(N == 2 ~ "duopoly", TRUE ~ "oligopoly")) %>%
-  mutate(airline = case_when(airline %in% c("GLO", "AZU", "TAM") ~ airline, TRUE ~ "OUT")) %>%
-  mutate(position = case_when(position == "lider" ~ airline, TRUE ~ position)) %>%
-  group_by(covid_wave, market, position) %>%
-  dplyr::summarise(demand = sum(seat_dem),
-                   revenue = sum(revenue),
-                   take_off = sum(take_off),
-                   seat_offer = sum(seat_offer))
-
+{
 # selecting routes that GLO was the leader competitor
 GLO = BASE1 %>%
   filter(N >= 2) %>%
-  mutate(code = paste0(month, "-", year, "-", air_dep, "-", air_arr)) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
   filter(market == "lider" & airline == "GLO") %>%
   group_by(code) %>%
   dplyr::summarise(n = n()) %>% 
@@ -486,7 +474,7 @@ GLO = as.vector(GLO$code)
 # filtering GLO vector into BASE1
 GLOc = BASE1 %>%
   arrange(year, month, air_dep, air_arr) %>%
-  mutate(code = paste0(month, "-", year, "-", air_dep, "-", air_arr)) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
   filter(code %in% GLO) %>% 
   mutate(position = market,
          market = case_when(N == 2 ~ "duopoly", TRUE ~ "oligopoly")) %>%
@@ -501,34 +489,53 @@ GLOc = BASE1 %>%
   gather(variable, value, price:aircraft) %>%
   spread(variable, value) %>%
   arrange(position, covid_wave, desc(market), code) %>%
-  group_by(position, covid_wave, market) %>% 
-  mutate(id = sequence(n()))
+  group_by(position, covid_wave, market) %>%
+  gather(variable, value, price:aircraft) %>%
+  spread(position, value)
+  group_by(market, covid_wave, variable) %>%
+  summarise(ttest = list(t.test(lider, seguidora))) %>%
+  mutate(ttest = map(ttest, tidy)) %>%
+  unnest()
+  
+  
 
-set.seed(123)
-df <- tibble(
-  ID = 1:20,
-  testA_wave1 = round(rnorm(20, 5, 3), 0),
-  testA_wave2 = round(rnorm(20, 5, 3), 0),
-  testA_wave3 = round(rnorm(20, 5, 3), 0),
-  testB_wave1 = round(rnorm(20, 5, 3), 0),
-  testB_wave2 = round(rnorm(20, 5, 3), 0),
-  testB_wave3 = round(rnorm(20, 5, 3), 0)
-)
-
-teste = df %>%
- gather(variable, value, -ID) %>%
- mutate(wave_ID = paste0("wave", parse_number(variable)),
-        variable = ifelse(grepl("testA", variable), "testA",
-                     ifelse(grepl("testB", variable), "testB", NA_character_))) %>%
- group_by(wave_ID, variable) %>% 
- summarise(value = list(value)) %>% 
- spread(wave_ID, value) %>%
- group_by(variable) %>%  
- mutate(p_value_w1w2 = t.test(unlist(wave1), unlist(wave2), paired = TRUE)$p.value,
-        p_value_w1w3 = t.test(unlist(wave1), unlist(wave3), paired = TRUE)$p.value) 
- select(variable, matches("(p_value)"))
+mutate(id = sequence(n()))
+  group_by(market, covid_wave) %>%
+  summarise(ttest_price = list(t.test(price ~ position, paired = TRUE)),
+            ttest_aircraft = list(t.test(aircraft ~ position, paired = TRUE))) %>%
+  mutate(ttest_price = map(ttest_price, tidy),
+         ttest_aircraft = map(ttest_aircraft, tidy)) %>%
+  unnest()
 
 
+  mutate(across(c("estimate", "p.value", "estimate1", "p.value1"), ~ round(.x, 3))) %>%
+  mutate(id = case_when(covid_wave == "normal" ~ 1,
+                        covid_wave == "first" ~ 2, TRUE ~ 3)) %>%
+  arrange(market, id) %>%
+  mutate(GLO_price = paste0(estimate, case_when(p.value <= 0.01 ~ "***",
+                                                p.value > 0.01 & p.value <=0.05 ~ "**",
+                                                p.value > 0.05 & p.value <=0.1 ~ "*", 
+                                                TRUE ~ "")),
+         GLO_aircraft = paste0(estimate1, case_when(p.value1 <= 0.01 ~ "***",
+                                                p.value1 > 0.01 & p.value1 <=0.05 ~ "**",
+                                                p.value1 > 0.05 & p.value1 <=0.1 ~ "*", 
+                                                TRUE ~ ""))) %>%
+  select(market, covid_wave, GLO_price, GLO_aircraft)
+
+} # organizing GOL dabase
+
+TESTE = BASE1 %>%
+  filter(N >= 2 & airline %in% c("GLO", "AZU", "TAM")) %>%
+  group_by(airline, covid_wave, market) %>%
+  dplyr::summarise(price = sum(revenue)/sum(seat_dem),
+                   aircraft = sum(seat_offer)/sum(take_off)) %>%
+  gather(variable, value, price:aircraft) %>%
+  spread(market, value) %>%
+  mutate(diff = lider-seguidora) %>%
+  mutate(id = case_when(covid_wave == "normal" ~ 1,
+                        covid_wave == "first" ~ 2, TRUE ~ 3)) %>%
+  arrange(id)
+  
 
 ```
 
