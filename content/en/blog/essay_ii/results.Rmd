@@ -386,7 +386,7 @@ kable(head(schedulle, n = 3L))
 
 Main results found:
 
- * 
+ * There was little change in boarding schedules. In general, passengers preferred to travel during the day (6:00 am to 5:00 pm) overnight hours (6:00 am to 5:00 am).
  
  
 ```{r competitors_I, include=TRUE, echo=FALSE}
