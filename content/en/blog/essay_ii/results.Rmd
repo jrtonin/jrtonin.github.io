@@ -18,7 +18,8 @@ memory.limit(size = 999999999999)
 { 
   # Check if the packages that we need are installed
   want = c("tidyverse", "plm", "texreg", "lmtest", "tibble",
-           "gluedown", "stringr", "rvest", "kableExtra", "broom")
+           "gluedown", "stringr", "rvest", "kableExtra", "broom", 
+           "ggstatsplot", "palmerpenguins", "ggpubr")
   have = want %in% rownames(installed.packages())
   # Install the packages that we miss
   if ( any(!have) ) { install.packages( want[!have] ) }
@@ -33,9 +34,9 @@ memory.limit(size = 999999999999)
 ```{r reading_databases, include=FALSE, echo=TRUE}
 
 # reading log databases
-LBASE1 = readRDS(url("https://github.com/jrtonin/thesis_essay_ii/raw/main/data/LBASE1_Essay_II.rds"))
+LBASE1 =  readRDS(url("https://github.com/jrtonin/thesis_essay_ii/raw/main/data/LBASE1_Essay_II.rds"))
 LBASE1c = readRDS(url("https://github.com/jrtonin/thesis_essay_ii/raw/main/data/LBASE1c_Essay_II.rds"))
-LBASE2 = readRDS(url("https://github.com/jrtonin/thesis_essay_ii/raw/main/data/LBASE2_Essay_II.rds"))
+LBASE2 =  readRDS(url("https://github.com/jrtonin/thesis_essay_ii/raw/main/data/LBASE2_Essay_II.rds"))
 LBASE2c = readRDS(url("https://github.com/jrtonin/thesis_essay_ii/raw/main/data/LBASE2c_Essay_II.rds"))
 
 # read normal databases
@@ -387,8 +388,10 @@ kable(head(schedulle, n = 3L))
 Main results found:
 
  * There was little change in boarding schedules. In general, passengers preferred to travel during the day (6:00 am to 5:00 pm) overnight hours (6:00 am to 5:00 am).
+
  
- 
+#### VI - What was the behavior of prices, average aircraft size, seat sales and take-offs of the top 3 airlines during the previous period and during the COVID19 pandemic?
+
 ```{r competitors_I, include=TRUE, echo=FALSE}
 
 # organizing database
@@ -454,9 +457,18 @@ kable(head(cprice, n = 12L))
  
 Main results found:
 
- * 
+ * There was an increase in the average size of the aircraft used;
  
-```{r competitors_II, include=TRUE, echo=FALSE}
+ * The number of competitors per route has decreased. Airlines probably concentrated their flights on more profitable routes;
+ 
+ * Prices decreased in the first the pandemic period, but return to increase in the second phase, remaining at a level above that seen before the pandemic;
+ 
+ * During the second phase of the pandemic, Azul intensified its takeoffs to routes that it was operating as a monopolist, while TAM and Gol returned to operating oligopolistic routes.
+ 
+
+#### Comparison of prices charged and aircraft operated by Gol on routes that it operates as a market leader or follower, in different market structures and periods  
+
+```{r GOL_leader_price}
 
 {
 # selecting routes that GLO was the leader competitor
@@ -472,7 +484,7 @@ GLO = BASE1 %>%
 GLO = as.vector(GLO$code) 
 
 # filtering GLO vector into BASE1
-GLOc = BASE1 %>%
+base = BASE1 %>%
   arrange(year, month, air_dep, air_arr) %>%
   mutate(code = paste0(year, month, air_dep, air_arr)) %>%
   filter(code %in% GLO) %>% 
@@ -491,57 +503,3094 @@ GLOc = BASE1 %>%
   arrange(position, covid_wave, desc(market), code) %>%
   group_by(position, covid_wave, market) %>%
   gather(variable, value, price:aircraft) %>%
-  spread(position, value)
-  group_by(market, covid_wave, variable) %>%
-  summarise(ttest = list(t.test(lider, seguidora))) %>%
-  mutate(ttest = map(ttest, tidy)) %>%
-  unnest()
-  
-  
-
-mutate(id = sequence(n()))
-  group_by(market, covid_wave) %>%
-  summarise(ttest_price = list(t.test(price ~ position, paired = TRUE)),
-            ttest_aircraft = list(t.test(aircraft ~ position, paired = TRUE))) %>%
-  mutate(ttest_price = map(ttest_price, tidy),
-         ttest_aircraft = map(ttest_aircraft, tidy)) %>%
-  unnest()
-
-
-  mutate(across(c("estimate", "p.value", "estimate1", "p.value1"), ~ round(.x, 3))) %>%
-  mutate(id = case_when(covid_wave == "normal" ~ 1,
-                        covid_wave == "first" ~ 2, TRUE ~ 3)) %>%
-  arrange(market, id) %>%
-  mutate(GLO_price = paste0(estimate, case_when(p.value <= 0.01 ~ "***",
-                                                p.value > 0.01 & p.value <=0.05 ~ "**",
-                                                p.value > 0.05 & p.value <=0.1 ~ "*", 
-                                                TRUE ~ "")),
-         GLO_aircraft = paste0(estimate1, case_when(p.value1 <= 0.01 ~ "***",
-                                                p.value1 > 0.01 & p.value1 <=0.05 ~ "**",
-                                                p.value1 > 0.05 & p.value1 <=0.1 ~ "*", 
-                                                TRUE ~ ""))) %>%
-  select(market, covid_wave, GLO_price, GLO_aircraft)
+  mutate(position =  case_when(position == "lider" ~ "Lider (Gol)",
+                               TRUE ~ "Follower")) %>%
+  filter(variable == "price")
 
 } # organizing GOL dabase
 
-TESTE = BASE1 %>%
-  filter(N >= 2 & airline %in% c("GLO", "AZU", "TAM")) %>%
-  group_by(airline, covid_wave, market) %>%
-  dplyr::summarise(price = sum(revenue)/sum(seat_dem),
-                   aircraft = sum(seat_offer)/sum(take_off)) %>%
-  gather(variable, value, price:aircraft) %>%
-  spread(market, value) %>%
-  mutate(diff = lider-seguidora) %>%
-  mutate(id = case_when(covid_wave == "normal" ~ 1,
-                        covid_wave == "first" ~ 2, TRUE ~ 3)) %>%
-  arrange(id)
-  
+# creating a price chart to GOL company
+
+{
+  { 
+    ## normal period
+    normal_d = ggbetweenstats(
+      data = base %>%
+        filter(variable == "price" & covid_wave == "normal" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (duopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"),
+            text=element_text(family="Serif"))
+    
+    normal_d
+
+    ## first period
+    first_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "first" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "second" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # duopoly
+  { 
+    ## normal period
+    normal_o = ggbetweenstats(
+      data = base %>%
+        filter(variable == "price" & covid_wave == "normal" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (oligopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    first_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "first" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "second" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # oligopoly
+  {
+    # merging all graphs
+    final = ggarrange(normal_d, first_d, second_d, 
+                      normal_o, first_o, second_o,
+                      ncol = 3, nrow = 2, 
+                      legend="bottom", common.legend = TRUE) + 
+      theme(legend.text = element_text(size=30),
+            legend.key.size = unit(2, 'cm'))
+    
+    # creating another graph
+    # final = annotate_figure(final)
+    
+    # setting directory
+    setwd("C:/TESE/FIGURES")
+    
+    ggsave("GOL_leader_price.png", plot = final, width = 30, height = 20)
+    
+  } # merging graphs
+} # GOL company
 
 ```
 
+```{r GOL_follower_price}
+
+{
+# selecting routes that GLO was the leader competitor
+GLO = BASE1 %>%
+  filter(N >= 2) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(market == "seguidora" & airline == "GLO") %>%
+  group_by(code) %>%
+  dplyr::summarise(n = n()) %>% 
+  select(-n)
+
+# generating GLO vector
+GLO = as.vector(GLO$code) 
+
+# filtering GLO vector into BASE1
+base = BASE1 %>%
+  arrange(year, month, air_dep, air_arr) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(code %in% GLO) %>% 
+  mutate(position = market,
+         market = case_when(N == 2 ~ "duopoly", TRUE ~ "oligopoly")) %>%
+  group_by(covid_wave, market, position, code) %>%
+  dplyr::summarise(demand = sum(seat_dem),
+                   revenue = sum(revenue),
+                   take_off = sum(take_off),
+                   seat_offer = sum(seat_offer)) %>%
+  mutate(price = revenue/demand, 
+         aircraft = seat_offer/take_off) %>%
+  select(-demand, -revenue, -take_off, -seat_offer) %>%
+  gather(variable, value, price:aircraft) %>%
+  spread(variable, value) %>%
+  arrange(position, covid_wave, desc(market), code) %>%
+  group_by(position, covid_wave, market) %>%
+  gather(variable, value, price:aircraft) %>%
+  mutate(position =  case_when(position == "lider" ~ "Lider",
+                               TRUE ~ "Follower (Gol)")) %>%
+  filter(variable == "price")
+
+} # organizing GOL dabase
+
+# creating a price chart to GOL company
+
+{
+  { 
+    ## normal period
+    normal_d = ggbetweenstats(
+      data = base %>%
+        filter(variable == "price" & covid_wave == "normal" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (duopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"),
+            text=element_text(family="Serif"))
+    
+    normal_d
+
+    ## first period
+    first_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "first" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "second" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # duopoly
+  { 
+    ## normal period
+    normal_o = ggbetweenstats(
+      data = base %>%
+        filter(variable == "price" & covid_wave == "normal" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (oligopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    first_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "first" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "second" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # oligopoly
+  {
+    # merging all graphs
+    final = ggarrange(normal_d, first_d, second_d, 
+                      normal_o, first_o, second_o,
+                      ncol = 3, nrow = 2, 
+                      legend="bottom", common.legend = TRUE) + 
+      theme(legend.text = element_text(size=30),
+            legend.key.size = unit(2, 'cm'))
+    
+    # creating another graph
+    # final = annotate_figure(final)
+    
+    # setting directory
+    setwd("C:/TESE/FIGURES")
+    
+    ggsave("GOL_seguidora_price.png", plot = final, width = 30, height = 20)
+    
+  } # merging graphs
+} # GOL company
+
+```
+
+```{r GOL_leader_aircraft}
+
+{
+# selecting routes that GLO was the leader competitor
+GLO = BASE1 %>%
+  filter(N >= 2) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(market == "lider" & airline == "GLO") %>%
+  group_by(code) %>%
+  dplyr::summarise(n = n()) %>% 
+  select(-n)
+
+# generating GLO vector
+GLO = as.vector(GLO$code) 
+
+# filtering GLO vector into BASE1
+base = BASE1 %>%
+  arrange(year, month, air_dep, air_arr) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(code %in% GLO) %>% 
+  mutate(position = market,
+         market = case_when(N == 2 ~ "duopoly", TRUE ~ "oligopoly")) %>%
+  group_by(covid_wave, market, position, code) %>%
+  dplyr::summarise(demand = sum(seat_dem),
+                   revenue = sum(revenue),
+                   take_off = sum(take_off),
+                   seat_offer = sum(seat_offer)) %>%
+  mutate(price = revenue/demand, 
+         aircraft = seat_offer/take_off) %>%
+  select(-demand, -revenue, -take_off, -seat_offer) %>%
+  gather(variable, value, price:aircraft) %>%
+  spread(variable, value) %>%
+  arrange(position, covid_wave, desc(market), code) %>%
+  group_by(position, covid_wave, market) %>%
+  gather(variable, value, price:aircraft) %>%
+  mutate(position =  case_when(position == "lider" ~ "Lider (Gol)",
+                               TRUE ~ "Follower")) %>%
+  filter(variable == "aircraft")
+
+} # organizing GOL dabase
+
+# creating a price chart to GOL company
+
+{
+  { 
+    ## normal period
+    normal_d = ggbetweenstats(
+      data = base %>%
+        filter(variable == "aircraft" & covid_wave == "normal" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (duopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"),
+            text=element_text(family="Serif"))
+    
+    normal_d
+
+    ## first period
+    first_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "first" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "second" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # duopoly
+  { 
+    ## normal period
+    normal_o = ggbetweenstats(
+      data = base %>%
+        filter(variable == "aircraft" & covid_wave == "normal" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (oligopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    first_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "first" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "second" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # oligopoly
+  {
+    # merging all graphs
+    final = ggarrange(normal_d, first_d, second_d, 
+                      normal_o, first_o, second_o,
+                      ncol = 3, nrow = 2, 
+                      legend="bottom", common.legend = TRUE) + 
+      theme(legend.text = element_text(size=30),
+            legend.key.size = unit(2, 'cm'))
+    
+    # creating another graph
+    # final = annotate_figure(final)
+    
+    # setting directory
+    setwd("C:/TESE/FIGURES")
+    
+    ggsave("GOL_leader_aircraft.png", plot = final, width = 30, height = 20)
+    
+  } # merging graphs
+} # GOL company
+
+```
+
+```{r GOL_follower_aircraft}
+
+{
+# selecting routes that GLO was the leader competitor
+GLO = BASE1 %>%
+  filter(N >= 2) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(market == "seguidora" & airline == "GLO") %>%
+  group_by(code) %>%
+  dplyr::summarise(n = n()) %>% 
+  select(-n)
+
+# generating GLO vector
+GLO = as.vector(GLO$code) 
+
+# filtering GLO vector into BASE1
+base = BASE1 %>%
+  arrange(year, month, air_dep, air_arr) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(code %in% GLO) %>% 
+  mutate(position = market,
+         market = case_when(N == 2 ~ "duopoly", TRUE ~ "oligopoly")) %>%
+  group_by(covid_wave, market, position, code) %>%
+  dplyr::summarise(demand = sum(seat_dem),
+                   revenue = sum(revenue),
+                   take_off = sum(take_off),
+                   seat_offer = sum(seat_offer)) %>%
+  mutate(price = revenue/demand, 
+         aircraft = seat_offer/take_off) %>%
+  select(-demand, -revenue, -take_off, -seat_offer) %>%
+  gather(variable, value, price:aircraft) %>%
+  spread(variable, value) %>%
+  arrange(position, covid_wave, desc(market), code) %>%
+  group_by(position, covid_wave, market) %>%
+  gather(variable, value, price:aircraft) %>%
+  mutate(position =  case_when(position == "lider" ~ "Lider",
+                               TRUE ~ "Follower (Gol)")) %>%
+  filter(variable == "aircraft")
+
+} # organizing GOL dabase
+
+# creating a price chart to GOL company
+
+{
+  { 
+    ## normal period
+    normal_d = ggbetweenstats(
+      data = base %>%
+        filter(variable == "aircraft" & covid_wave == "normal" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (duopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"),
+            text=element_text(family="Serif"))
+    
+    normal_d
+
+    ## first period
+    first_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "first" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "second" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # duopoly
+  { 
+    ## normal period
+    normal_o = ggbetweenstats(
+      data = base %>%
+        filter(variable == "aircraft" & covid_wave == "normal" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (oligopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    first_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "first" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "second" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # oligopoly
+  {
+    # merging all graphs
+    final = ggarrange(normal_d, first_d, second_d, 
+                      normal_o, first_o, second_o,
+                      ncol = 3, nrow = 2, 
+                      legend="bottom", common.legend = TRUE) + 
+      theme(legend.text = element_text(size=30),
+            legend.key.size = unit(2, 'cm'))
+    
+    # creating another graph
+    # final = annotate_figure(final)
+    
+    # setting directory
+    setwd("C:/TESE/FIGURES")
+    
+    ggsave("GOL_seguidora_aircraft.png", plot = final, width = 30, height = 20)
+    
+  } # merging graphs
+} # GOL company
+
+```
+
+Analysing the comparison graphs between the prices and average aircraft size of the three main airlines, in different market positions, leader or follower, it is possible to see that there is a negative relationship between average aircraft size and air ticket prices.
+
+Analyzing Gol's data, it is noted:
+
+ * During the period analized, Gol used larger aircraft compared to competitors, either acting as a market leader or follower. In the normal period, in both market positions, it operated with more competitive prices in relation to its competitors. That reality was altered in the pandemic. The company started to charge average prices higher than those of its competitors when operating on routes as a market leader.
+ 
+
+#### Comparison of prices charged and aircraft operated by Azul on routes that it operates as a market leader or follower, in different market structures and periods  
+
+```{r AZUL_leader_price}
+
+{
+# selecting routes that AZU was the leader competitor
+AZU = BASE1 %>%
+  filter(N >= 2) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(market == "lider" & airline == "AZU") %>%
+  group_by(code) %>%
+  dplyr::summarise(n = n()) %>% 
+  select(-n)
+
+# generating AZU vector
+AZU = as.vector(AZU$code) 
+
+# filtering AZU vector into BASE1
+base = BASE1 %>%
+  arrange(year, month, air_dep, air_arr) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(code %in% AZU) %>% 
+  mutate(position = market,
+         market = case_when(N == 2 ~ "duopoly", TRUE ~ "oligopoly")) %>%
+  group_by(covid_wave, market, position, code) %>%
+  dplyr::summarise(demand = sum(seat_dem),
+                   revenue = sum(revenue),
+                   take_off = sum(take_off),
+                   seat_offer = sum(seat_offer)) %>%
+  mutate(price = revenue/demand, 
+         aircraft = seat_offer/take_off) %>%
+  select(-demand, -revenue, -take_off, -seat_offer) %>%
+  gather(variable, value, price:aircraft) %>%
+  spread(variable, value) %>%
+  arrange(position, covid_wave, desc(market), code) %>%
+  group_by(position, covid_wave, market) %>%
+  gather(variable, value, price:aircraft) %>%
+  mutate(position =  case_when(position == "lider" ~ "Lider (Azul)",
+                               TRUE ~ "Follower")) %>%
+  filter(variable == "price")
+
+} # organizing AZU dabase
+
+# creating a price chart to AZU company
+
+{
+  { 
+    ## normal period
+    normal_d = ggbetweenstats(
+      data = base %>%
+        filter(variable == "price" & covid_wave == "normal" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (duopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"),
+            text=element_text(family="Serif"))
+    
+    normal_d
+
+    ## first period
+    first_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "first" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "second" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # duopoly
+  { 
+    ## normal period
+    normal_o = ggbetweenstats(
+      data = base %>%
+        filter(variable == "price" & covid_wave == "normal" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (oligopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    first_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "first" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "second" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # oligopoly
+  {
+    # merging all graphs
+    final = ggarrange(normal_d, first_d, second_d, 
+                      normal_o, first_o, second_o,
+                      ncol = 3, nrow = 2, 
+                      legend="bottom", common.legend = TRUE) + 
+      theme(legend.text = element_text(size=30),
+            legend.key.size = unit(2, 'cm'))
+    
+    # creating another graph
+    # final = annotate_figure(final)
+    
+    # setting directory
+    setwd("C:/TESE/FIGURES")
+    
+    ggsave("AZU_leader_price.png", plot = final, width = 30, height = 20)
+    
+  } # merging graphs
+} # Azul company
+
+```
+
+```{r AZUL_follower_price}
+
+{
+# selecting routes that AZU was the leader competitor
+AZU = BASE1 %>%
+  filter(N >= 2) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(market == "seguidora" & airline == "AZU") %>%
+  group_by(code) %>%
+  dplyr::summarise(n = n()) %>% 
+  select(-n)
+
+# generating AZU vector
+AZU = as.vector(AZU$code) 
+
+# filtering AZU vector into BASE1
+base = BASE1 %>%
+  arrange(year, month, air_dep, air_arr) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(code %in% AZU) %>% 
+  mutate(position = market,
+         market = case_when(N == 2 ~ "duopoly", TRUE ~ "oligopoly")) %>%
+  group_by(covid_wave, market, position, code) %>%
+  dplyr::summarise(demand = sum(seat_dem),
+                   revenue = sum(revenue),
+                   take_off = sum(take_off),
+                   seat_offer = sum(seat_offer)) %>%
+  mutate(price = revenue/demand, 
+         aircraft = seat_offer/take_off) %>%
+  select(-demand, -revenue, -take_off, -seat_offer) %>%
+  gather(variable, value, price:aircraft) %>%
+  spread(variable, value) %>%
+  arrange(position, covid_wave, desc(market), code) %>%
+  group_by(position, covid_wave, market) %>%
+  gather(variable, value, price:aircraft) %>%
+  mutate(position =  case_when(position == "lider" ~ "Lider",
+                               TRUE ~ "Follower (Azul)")) %>%
+  filter(variable == "price")
+
+} # organizing Azul dabase
+
+# creating a price chart to Azul company
+
+{
+  { 
+    ## normal period
+    normal_d = ggbetweenstats(
+      data = base %>%
+        filter(variable == "price" & covid_wave == "normal" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (duopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"),
+            text=element_text(family="Serif"))
+    
+    normal_d
+
+    ## first period
+    first_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "first" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "second" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # duopoly
+  { 
+    ## normal period
+    normal_o = ggbetweenstats(
+      data = base %>%
+        filter(variable == "price" & covid_wave == "normal" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (oligopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    first_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "first" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "second" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # oligopoly
+  {
+    # merging all graphs
+    final = ggarrange(normal_d, first_d, second_d, 
+                      normal_o, first_o, second_o,
+                      ncol = 3, nrow = 2, 
+                      legend="bottom", common.legend = TRUE) + 
+      theme(legend.text = element_text(size=30),
+            legend.key.size = unit(2, 'cm'))
+    
+    # creating another graph
+    # final = annotate_figure(final)
+    
+    # setting directory
+    setwd("C:/TESE/FIGURES")
+    
+    ggsave("AZU_seguidora_price.png", plot = final, width = 30, height = 20)
+    
+  } # merging graphs
+} # Azul company
+
+```
+
+```{r AZUL_leader_aircraft}
+
+{
+# selecting routes that AZU was the leader competitor
+AZU = BASE1 %>%
+  filter(N >= 2) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(market == "lider" & airline == "AZU") %>%
+  group_by(code) %>%
+  dplyr::summarise(n = n()) %>% 
+  select(-n)
+
+# generating AZU vector
+AZU = as.vector(AZU$code) 
+
+# filtering GLO vector into BASE1
+base = BASE1 %>%
+  arrange(year, month, air_dep, air_arr) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(code %in% AZU) %>% 
+  mutate(position = market,
+         market = case_when(N == 2 ~ "duopoly", TRUE ~ "oligopoly")) %>%
+  group_by(covid_wave, market, position, code) %>%
+  dplyr::summarise(demand = sum(seat_dem),
+                   revenue = sum(revenue),
+                   take_off = sum(take_off),
+                   seat_offer = sum(seat_offer)) %>%
+  mutate(price = revenue/demand, 
+         aircraft = seat_offer/take_off) %>%
+  select(-demand, -revenue, -take_off, -seat_offer) %>%
+  gather(variable, value, price:aircraft) %>%
+  spread(variable, value) %>%
+  arrange(position, covid_wave, desc(market), code) %>%
+  group_by(position, covid_wave, market) %>%
+  gather(variable, value, price:aircraft) %>%
+  mutate(position =  case_when(position == "lider" ~ "Lider (Azul)",
+                               TRUE ~ "Follower")) %>%
+  filter(variable == "aircraft")
+
+} # organizing AZU dabase
+
+# creating a price chart to AZU company
+
+{
+  { 
+    ## normal period
+    normal_d = ggbetweenstats(
+      data = base %>%
+        filter(variable == "aircraft" & covid_wave == "normal" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (duopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"),
+            text=element_text(family="Serif"))
+    
+    normal_d
+
+    ## first period
+    first_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "first" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "second" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # duopoly
+  { 
+    ## normal period
+    normal_o = ggbetweenstats(
+      data = base %>%
+        filter(variable == "aircraft" & covid_wave == "normal" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (oligopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    first_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "first" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "second" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # oligopoly
+  {
+    # merging all graphs
+    final = ggarrange(normal_d, first_d, second_d, 
+                      normal_o, first_o, second_o,
+                      ncol = 3, nrow = 2, 
+                      legend="bottom", common.legend = TRUE) + 
+      theme(legend.text = element_text(size=30),
+            legend.key.size = unit(2, 'cm'))
+    
+    # creating another graph
+    # final = annotate_figure(final)
+    
+    # setting directory
+    setwd("C:/TESE/FIGURES")
+    
+    ggsave("AZU_leader_aircraft.png", plot = final, width = 30, height = 20)
+    
+  } # merging graphs
+} # AZU company
+
+```
+
+```{r AZUL_follower_aircraft}
+
+{
+# selecting routes that AZU was the leader competitor
+AZU = BASE1 %>%
+  filter(N >= 2) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(market == "seguidora" & airline == "AZU") %>%
+  group_by(code) %>%
+  dplyr::summarise(n = n()) %>% 
+  select(-n)
+
+# generating AZU vector
+AZU = as.vector(AZU$code) 
+
+# filtering AZU vector into BASE1
+base = BASE1 %>%
+  arrange(year, month, air_dep, air_arr) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(code %in% AZU) %>% 
+  mutate(position = market,
+         market = case_when(N == 2 ~ "duopoly", TRUE ~ "oligopoly")) %>%
+  group_by(covid_wave, market, position, code) %>%
+  dplyr::summarise(demand = sum(seat_dem),
+                   revenue = sum(revenue),
+                   take_off = sum(take_off),
+                   seat_offer = sum(seat_offer)) %>%
+  mutate(price = revenue/demand, 
+         aircraft = seat_offer/take_off) %>%
+  select(-demand, -revenue, -take_off, -seat_offer) %>%
+  gather(variable, value, price:aircraft) %>%
+  spread(variable, value) %>%
+  arrange(position, covid_wave, desc(market), code) %>%
+  group_by(position, covid_wave, market) %>%
+  gather(variable, value, price:aircraft) %>%
+  mutate(position =  case_when(position == "lider" ~ "Lider",
+                               TRUE ~ "Follower (Azul)")) %>%
+  filter(variable == "aircraft")
+
+} # organizing AZU dabase
+
+# creating a price chart to AZU company
+
+{
+  { 
+    ## normal period
+    normal_d = ggbetweenstats(
+      data = base %>%
+        filter(variable == "aircraft" & covid_wave == "normal" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (duopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"),
+            text=element_text(family="Serif"))
+    
+    normal_d
+
+    ## first period
+    first_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "first" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "second" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # duopoly
+  { 
+    ## normal period
+    normal_o = ggbetweenstats(
+      data = base %>%
+        filter(variable == "aircraft" & covid_wave == "normal" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (oligopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    first_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "first" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "second" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # oligopoly
+  {
+    # merging all graphs
+    final = ggarrange(normal_d, first_d, second_d, 
+                      normal_o, first_o, second_o,
+                      ncol = 3, nrow = 2, 
+                      legend="bottom", common.legend = TRUE) + 
+      theme(legend.text = element_text(size=30),
+            legend.key.size = unit(2, 'cm'))
+    
+    # creating another graph
+    # final = annotate_figure(final)
+    
+    # setting directory
+    setwd("C:/TESE/FIGURES")
+    
+    ggsave("AZU_seguidora_aircraft.png", plot = final, width = 30, height = 20)
+    
+  } # merging graphs
+} # AZU company
+
+```
+
+ * Azul uses the opposite strategy to that applied by Gol. It uses smaller aircraft and has an average ticket price higher than its competitors, even acting as a leader or follower. During the pandemic period, the company increased the average price of tickets, the price difference in relation to the competitor and the average size of the aircraft used.
 
 
+#### Comparison of prices charged and aircraft operated by Tam on routes that it operates as a market leader or follower, in different market structures and periods  
 
+```{r TAM_leader_price}
+
+{
+# selecting routes that TAM was the leader competitor
+TAM = BASE1 %>%
+  filter(N >= 2) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(market == "lider" & airline == "AZU") %>%
+  group_by(code) %>%
+  dplyr::summarise(n = n()) %>% 
+  select(-n)
+
+# generating TAM vector
+TAM = as.vector(TAM$code) 
+
+# filtering TAM vector into BASE1
+base = BASE1 %>%
+  arrange(year, month, air_dep, air_arr) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(code %in% TAM) %>% 
+  mutate(position = market,
+         market = case_when(N == 2 ~ "duopoly", TRUE ~ "oligopoly")) %>%
+  group_by(covid_wave, market, position, code) %>%
+  dplyr::summarise(demand = sum(seat_dem),
+                   revenue = sum(revenue),
+                   take_off = sum(take_off),
+                   seat_offer = sum(seat_offer)) %>%
+  mutate(price = revenue/demand, 
+         aircraft = seat_offer/take_off) %>%
+  select(-demand, -revenue, -take_off, -seat_offer) %>%
+  gather(variable, value, price:aircraft) %>%
+  spread(variable, value) %>%
+  arrange(position, covid_wave, desc(market), code) %>%
+  group_by(position, covid_wave, market) %>%
+  gather(variable, value, price:aircraft) %>%
+  mutate(position =  case_when(position == "lider" ~ "Lider (Tam)",
+                               TRUE ~ "Follower")) %>%
+  filter(variable == "price")
+
+} # organizing TAM dabase
+
+# creating a price chart to TAM company
+
+{
+  { 
+    ## normal period
+    normal_d = ggbetweenstats(
+      data = base %>%
+        filter(variable == "price" & covid_wave == "normal" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (duopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"),
+            text=element_text(family="Serif"))
+    
+    normal_d
+
+    ## first period
+    first_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "first" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "second" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # duopoly
+  { 
+    ## normal period
+    normal_o = ggbetweenstats(
+      data = base %>%
+        filter(variable == "price" & covid_wave == "normal" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (oligopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    first_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "first" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "second" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # oligopoly
+  {
+    # merging all graphs
+    final = ggarrange(normal_d, first_d, second_d, 
+                      normal_o, first_o, second_o,
+                      ncol = 3, nrow = 2, 
+                      legend="bottom", common.legend = TRUE) + 
+      theme(legend.text = element_text(size=30),
+            legend.key.size = unit(2, 'cm'))
+    
+    # creating another graph
+    # final = annotate_figure(final)
+    
+    # setting directory
+    setwd("C:/TESE/FIGURES")
+    
+    ggsave("TAM_leader_price.png", plot = final, width = 30, height = 20)
+    
+  } # merging graphs
+} # TAM company
+
+```
+
+```{r TAM_follower_price}
+
+{
+# selecting routes that TAM was the leader competitor
+TAM = BASE1 %>%
+  filter(N >= 2) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(market == "seguidora" & airline == "AZU") %>%
+  group_by(code) %>%
+  dplyr::summarise(n = n()) %>% 
+  select(-n)
+
+# generating TAM vector
+TAM = as.vector(TAM$code) 
+
+# filtering TAM vector into BASE1
+base = BASE1 %>%
+  arrange(year, month, air_dep, air_arr) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(code %in% TAM) %>% 
+  mutate(position = market,
+         market = case_when(N == 2 ~ "duopoly", TRUE ~ "oligopoly")) %>%
+  group_by(covid_wave, market, position, code) %>%
+  dplyr::summarise(demand = sum(seat_dem),
+                   revenue = sum(revenue),
+                   take_off = sum(take_off),
+                   seat_offer = sum(seat_offer)) %>%
+  mutate(price = revenue/demand, 
+         aircraft = seat_offer/take_off) %>%
+  select(-demand, -revenue, -take_off, -seat_offer) %>%
+  gather(variable, value, price:aircraft) %>%
+  spread(variable, value) %>%
+  arrange(position, covid_wave, desc(market), code) %>%
+  group_by(position, covid_wave, market) %>%
+  gather(variable, value, price:aircraft) %>%
+  mutate(position =  case_when(position == "lider" ~ "Lider",
+                               TRUE ~ "Follower (Tam)")) %>%
+  filter(variable == "price")
+
+} # organizing TAM dabase
+
+# creating a price chart to TAM company
+
+{
+  { 
+    ## normal period
+    normal_d = ggbetweenstats(
+      data = base %>%
+        filter(variable == "price" & covid_wave == "normal" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (duopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"),
+            text=element_text(family="Serif"))
+    
+    normal_d
+
+    ## first period
+    first_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "first" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "second" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # duopoly
+  { 
+    ## normal period
+    normal_o = ggbetweenstats(
+      data = base %>%
+        filter(variable == "price" & covid_wave == "normal" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (oligopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    first_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "first" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "price" & covid_wave == "second" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 1500, 250),
+        limits = (c(0, 1500)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # oligopoly
+  {
+    # merging all graphs
+    final = ggarrange(normal_d, first_d, second_d, 
+                      normal_o, first_o, second_o,
+                      ncol = 3, nrow = 2, 
+                      legend="bottom", common.legend = TRUE) + 
+      theme(legend.text = element_text(size=30),
+            legend.key.size = unit(2, 'cm'))
+    
+    # creating another graph
+    # final = annotate_figure(final)
+    
+    # setting directory
+    setwd("C:/TESE/FIGURES")
+    
+    ggsave("TAM_seguidora_price.png", plot = final, width = 30, height = 20)
+    
+  } # merging graphs
+} # TAM company
+
+```
+
+```{r TAM_leader_aircraft}
+
+{
+# selecting routes that TAM was the leader competitor
+TAM = BASE1 %>%
+  filter(N >= 2) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(market == "lider" & airline == "AZU") %>%
+  group_by(code) %>%
+  dplyr::summarise(n = n()) %>% 
+  select(-n)
+
+# generating TAM vector
+TAM = as.vector(TAM$code) 
+
+# filtering TAM vector into BASE1
+base = BASE1 %>%
+  arrange(year, month, air_dep, air_arr) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(code %in% TAM) %>% 
+  mutate(position = market,
+         market = case_when(N == 2 ~ "duopoly", TRUE ~ "oligopoly")) %>%
+  group_by(covid_wave, market, position, code) %>%
+  dplyr::summarise(demand = sum(seat_dem),
+                   revenue = sum(revenue),
+                   take_off = sum(take_off),
+                   seat_offer = sum(seat_offer)) %>%
+  mutate(price = revenue/demand, 
+         aircraft = seat_offer/take_off) %>%
+  select(-demand, -revenue, -take_off, -seat_offer) %>%
+  gather(variable, value, price:aircraft) %>%
+  spread(variable, value) %>%
+  arrange(position, covid_wave, desc(market), code) %>%
+  group_by(position, covid_wave, market) %>%
+  gather(variable, value, price:aircraft) %>%
+  mutate(position =  case_when(position == "lider" ~ "Lider (Tam)",
+                               TRUE ~ "Follower")) %>%
+  filter(variable == "aircraft")
+
+} # organizing TAM dabase
+
+# creating a price chart to AZU company
+
+{
+  { 
+    ## normal period
+    normal_d = ggbetweenstats(
+      data = base %>%
+        filter(variable == "aircraft" & covid_wave == "normal" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (duopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"),
+            text=element_text(family="Serif"))
+    
+    normal_d
+
+    ## first period
+    first_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "first" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "second" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # duopoly
+  { 
+    ## normal period
+    normal_o = ggbetweenstats(
+      data = base %>%
+        filter(variable == "aircraft" & covid_wave == "normal" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (oligopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    first_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "first" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "second" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # oligopoly
+  {
+    # merging all graphs
+    final = ggarrange(normal_d, first_d, second_d, 
+                      normal_o, first_o, second_o,
+                      ncol = 3, nrow = 2, 
+                      legend="bottom", common.legend = TRUE) + 
+      theme(legend.text = element_text(size=30),
+            legend.key.size = unit(2, 'cm'))
+    
+    # creating another graph
+    # final = annotate_figure(final)
+    
+    # setting directory
+    setwd("C:/TESE/FIGURES")
+    
+    ggsave("TAM_leader_aircraft.png", plot = final, width = 30, height = 20)
+    
+  } # merging graphs
+} # TAM company
+
+```
+
+```{r TAM_follower_aircraft}
+
+{
+# selecting routes that TAM was the leader competitor
+TAM = BASE1 %>%
+  filter(N >= 2) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(market == "seguidora" & airline == "TAM") %>%
+  group_by(code) %>%
+  dplyr::summarise(n = n()) %>% 
+  select(-n)
+
+# generating TAM vector
+TAM = as.vector(TAM$code) 
+
+# filtering TAM vector into BASE1
+base = BASE1 %>%
+  arrange(year, month, air_dep, air_arr) %>%
+  mutate(code = paste0(year, month, air_dep, air_arr)) %>%
+  filter(code %in% TAM) %>% 
+  mutate(position = market,
+         market = case_when(N == 2 ~ "duopoly", TRUE ~ "oligopoly")) %>%
+  group_by(covid_wave, market, position, code) %>%
+  dplyr::summarise(demand = sum(seat_dem),
+                   revenue = sum(revenue),
+                   take_off = sum(take_off),
+                   seat_offer = sum(seat_offer)) %>%
+  mutate(price = revenue/demand, 
+         aircraft = seat_offer/take_off) %>%
+  select(-demand, -revenue, -take_off, -seat_offer) %>%
+  gather(variable, value, price:aircraft) %>%
+  spread(variable, value) %>%
+  arrange(position, covid_wave, desc(market), code) %>%
+  group_by(position, covid_wave, market) %>%
+  gather(variable, value, price:aircraft) %>%
+  mutate(position =  case_when(position == "lider" ~ "Lider",
+                               TRUE ~ "Follower (Tam)")) %>%
+  filter(variable == "aircraft")
+
+} # organizing TAM dabase
+
+# creating a price chart to TAM company
+
+{
+  { 
+    ## normal period
+    normal_d = ggbetweenstats(
+      data = base %>%
+        filter(variable == "aircraft" & covid_wave == "normal" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (duopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"),
+            text=element_text(family="Serif"))
+    
+    normal_d
+
+    ## first period
+    first_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "first" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_d = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "second" & market == "duopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (duopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # duopoly
+  { 
+    ## normal period
+    normal_o = ggbetweenstats(
+      data = base %>%
+        filter(variable == "aircraft" & covid_wave == "normal" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Normal (oligopoly)",
+      xlab = element_blank(),
+      ylab = "Price (R$)",
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    first_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "first" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "First (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75, 
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    ## first period
+    second_o = ggbetweenstats(
+      data = base %>% 
+        filter(variable == "aircraft" & covid_wave == "second" & market == "oligopoly"),
+      x = position,
+      y = value,
+      centrality.label.args = list(size  = 8),
+      plot.type = "violin",
+      pairwise.comparisons = TRUE,
+      pairwise.display = "significant",
+      bf.message = FALSE,
+      results.subtitle = FALSE,
+      title = "Second (oligopoly)",
+      xlab = element_blank(),
+      ylab = element_blank(),
+    
+      ggplot.component = scale_y_continuous(
+        breaks = seq(0, 250, 50),
+        limits = (c(0, 250)))
+      ) + 
+      theme(panel.grid = element_blank(), 
+            plot.title = element_text(size=28, hjust = 0.5),
+            aspect.ratio = 0.75,
+            panel.border=element_blank(),
+            axis.ticks=element_blank(),
+            axis.text.x = element_text(color = "grey20", size = 22, angle = 0, hjust = .5, 
+                                       vjust = .5, face = "plain"),
+            axis.text.y = element_text(color = "grey20", size = 16, 
+                                       angle = 0, hjust = 1, vjust = 0, face = "plain"),
+            axis.title.y = element_text(color = "black", size = 22, angle = 90, 
+                                        hjust = .5, vjust = .5, face = "plain"))
+    
+    } # oligopoly
+  {
+    # merging all graphs
+    final = ggarrange(normal_d, first_d, second_d, 
+                      normal_o, first_o, second_o,
+                      ncol = 3, nrow = 2, 
+                      legend="bottom", common.legend = TRUE) + 
+      theme(legend.text = element_text(size=30),
+            legend.key.size = unit(2, 'cm'))
+    
+    # creating another graph
+    # final = annotate_figure(final)
+    
+    # setting directory
+    setwd("C:/TESE/FIGURES")
+    
+    ggsave("TAM_seguidora_aircraft.png", plot = final, width = 30, height = 20)
+    
+  } # merging graphs
+} # TAM company
+
+```
+
+ * Tam uses a mixed strategy between Azul and Gol. It operates with smaller aircraft in the markets it acts as a leader and with mixed size in the markets it acts as a follower. In relation to the average prices practiced, the strategy is very close to that verified by Azul, higher prices in relation to competitors, even acting as a leader or follower in the market.
 
 ```{r sd_full, include=FALSE, echo=FALSE}
 
