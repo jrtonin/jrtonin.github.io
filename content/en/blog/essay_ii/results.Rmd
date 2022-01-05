@@ -3745,7 +3745,6 @@ dLBASE2c = pdata.frame(dLBASE2c, index = c("id","time")) %>%
 
 } # organizing LBASE2c
 
-
 ```
 
 ```{r base1, include = FALSE, echo = FALSE}
