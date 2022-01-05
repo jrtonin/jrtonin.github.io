@@ -3681,7 +3681,7 @@ dLBASE2c = pdata.frame(dLBASE2c, index = c("id","time")) %>%
 
 ```
 
-```{r base1, include = FALSE, echo = FALSE}
+```{r estimation_I, include = FALSE, echo = FALSE}
 
 # dummies | Tourist | N | market | covid | covid_wave | quarter | airline
 # arrival dummies | ArrHUB | market_arr | region_arr | capital_arr 
@@ -3693,8 +3693,8 @@ OLS = price ~  hubling + aircraft + flight_hours + MMC + connection + X6.11 + X1
   factor(capital_arr) + factor(position) + factor(market) + factor(covid_leader)
 
 IV = price ~ hubling + aircraft + flight_hours + MMC + connection + X6.11 + X12.17 + X18.23 + RouteShare + 
-  factor(Tourist) + factor(covid_wave) + factor(quarter) + factor(ArrHUB) + factor(capital_arr) + factor(position) + 
-  factor(market) + factor(covid_leader) | . -RouteShare + m150RouteShare 
+  factor(Tourist) + factor(covid_wave) + factor(quarter) + factor(ArrHUB) +
+  factor(capital_arr) + factor(position) + factor(market) + factor(covid_leader) | . -RouteShare + m150RouteShare 
 
 GMM = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
   connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:17) + lag(price, 2:18) + m150RouteShare
@@ -3763,20 +3763,21 @@ screenreg(list(gmm0 = GMM0, gmm1 = GMM1, gmm2 = GMM2, gmm3 = GMM3, gmm4 = GMM4),
 
 ```
 
-```{r base1, include = FALSE, echo = FALSE}
+```{r estimation_II, include = FALSE, echo = FALSE}
 
 # dummies | Tourist | N | market | covid | covid_wave | quarter | airline
 # arrival dummies | ArrHUB | market_arr | region_arr | capital_arr 
 # departure dummies | DepHUB | market_dep | capital_dep | region_dep
 
 # defining equations
-OLS = price ~  hubling + aircraft + flight_hours + MMC + connection + X6.11 + X12.17 + X18.23 + RouteShare
+OLS = price ~  hubling + aircraft + flight_hours + MMC + connection + X6.11 + X12.17 + X18.23 + RouteShare +
+  factor(Tourist) + factor(covid_wave) + factor(quarter) + factor(ArrHUB)
 
-IV = price ~ hubling + aircraft + flight_hours + MMC + connection + X6.11 + X12.17 + X18.23 + 
-  RouteShare | . -RouteShare + m150RouteShare 
+IV = price ~ hubling + aircraft + flight_hours + MMC + connection + X6.11 + X12.17 + X18.23 + RouteShare +
+  factor(Tourist) + factor(covid_wave) + factor(quarter) + factor(ArrHUB) | . -RouteShare + m150RouteShare 
 
 GMM = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
-  connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:17) + lag(price, 2:18) + m150RouteShare
+  connection + X6.11 + X12.17 + X18.23 + RouteShare | llag(RouteShare, 1:2) + lag(price, 2:3) + m150RouteShare
 
 # regression
 ols = plm(OLS, data = dLBASE2, model = "pooling")
@@ -3803,7 +3804,7 @@ ht1w = plm(IV, data = dLBASE2, model = "within",
 #phtest(ht1w, ht1r)
 
 # gmm  
-gmm = pgmm(GMM, dLBASE1, model = "onestep", effect="individual")
+gmm = pgmm(GMM, dLBASE2, model = "onestep", effect="individual")
 
 # joining regression results
 screenreg(list(ols = ols, fe = fe, ivfe = ivfe, ecw1 = ecw1, ht1r = ht1r, gmm = gmm),
@@ -3839,6 +3840,8 @@ GMM4 = pgmm(GMM4, dLBASE2, model = "onestep", effect="individual")
 # joining regression results
 screenreg(list(gmm0 = GMM0, gmm1 = GMM1, gmm2 = GMM2, gmm3 = GMM3, gmm4 = GMM4),
                digits = 3, omit.coef = "(Intercept)")
+
+summary(GMM0)
 
 ```
 
