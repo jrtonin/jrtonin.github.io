@@ -3592,90 +3592,17 @@ base = BASE1 %>%
 
  * Tam uses a mixed strategy between Azul and Gol. It operates with smaller aircraft in the markets it acts as a leader and with mixed size in the markets it acts as a follower. In relation to the average prices practiced, the strategy is very close to that verified by Azul, higher prices in relation to competitors, even acting as a leader or follower in the market.
 
-```{r sd_full, include=FALSE, echo=FALSE}
-
-## organizing database
-
-# applying mean operation
-sdfulla = BASE1 %>% ungroup() %>%
-  group_by(covid_wave) %>%
-  summarise(across(c(price, hubling, aircraft, flight_hours, take_off, RouteShare, tx_seat, 
-         free_luggage, paid_luggage, `0-5`, `6-11`, `12-17`, `18-23`, DepHUB,          
-         capital_dep, ArrHUB, capital_arr), ~ mean(.x, na.rm = TRUE))) %>%
-  mutate(covid_wave = case_when(covid_wave == "normal" ~ 1,
-                                covid_wave == "first" ~ 3,
-                                covid_wave == "second" ~ 5, TRUE ~ 0))
-
-# applying sd operation
-sdfullb = BASE1 %>% ungroup() %>%
-  group_by(covid_wave) %>%
-  summarise(across(c(price, hubling, aircraft, flight_hours, take_off, RouteShare, tx_seat, 
-         free_luggage, paid_luggage, `0-5`, `6-11`, `12-17`, `18-23`, DepHUB,          
-         capital_dep, ArrHUB, capital_arr), ~ sd(.x, na.rm = TRUE))) %>%
-  mutate(covid_wave = case_when(covid_wave == "normal" ~ 2,
-                                covid_wave == "first" ~ 4,
-                                covid_wave == "second" ~ 6, TRUE ~ 0))
-
-# merging mean and sd databases
-sdfull = sdfulla %>%
-  bind_rows(sdfullb) %>%
-  arrange(covid_wave) %>%
-  mutate(across(c(price, hubling, aircraft, flight_hours, take_off, RouteShare, tx_seat, 
-         free_luggage, paid_luggage, `0-5`, `6-11`, `12-17`, `18-23`, DepHUB,          
-         capital_dep, ArrHUB, capital_arr), ~ round(.x, 2))) %>%
-  mutate(covid_wave = case_when(covid_wave == 1 ~ "normal_mean",
-                                covid_wave == 2 ~ "normal_sd",
-                                covid_wave == 3 ~ "first_mean",
-                                covid_wave == 4 ~ "first_sd",
-                                covid_wave == 5 ~ "second_mean",
-                                covid_wave == 6 ~ "second_sd", TRUE ~ "erro")) %>%
-  gather(variable,value,price:capital_arr) %>%
-  spread(covid_wave,value) %>%
-  select(variable, normal_mean, normal_sd, first_mean, first_sd, second_mean, second_sd)
-  
-print(sdfull)
-
-```
-
-```{r sd_full_duopoly, include=FALSE, echo=FALSE}
-
-# applying mean operation
-sdfulla = BASE1 %>% ungroup() %>%
-  filter(N == 2) %>%
-  group_by(covid_wave, market) %>%
-  summarise(across(c(price, hubling, aircraft, flight_hours, take_off, RouteShare, tx_seat, 
-         free_luggage, paid_luggage, `0-5`, `6-11`, `12-17`, `18-23`, DepHUB,          
-         capital_dep, ArrHUB, capital_arr), ~ mean(.x, na.rm = TRUE))) %>%
-  mutate(covid_wave = case_when(covid_wave == "normal" ~ 1,
-                                covid_wave == "first" ~ 3,
-                                covid_wave == "second" ~ 5, TRUE ~ 0))
-
-
-# applying mean operation
-sdfulla = BASE1 %>% ungroup() %>%
-  filter(N == 2) %>%
-  select(year, month, air_dep, air_arr, market, covid_wave,
-         price, hubling, aircraft, flight_hours, take_off, RouteShare, tx_seat, 
-         free_luggage, paid_luggage, `0-5`, `6-11`, `12-17`, `18-23`) %>%
-  gather(variable, value, price:`18-23`) %>%
-  arrange(variable, market) %>% 
-  group_by(year, month, air_dep, air_arr, market, variable) %>%
-  mutate(id = sequence(n())) %>%
-  group_by(variable) %>%
-  spread(market, value) %>%
-  filter(variable == "price") %>%
-  group_by(year, month, covid_wave) %>%
-  dplyr::summarise(meanl = mean(lider),
-                   means = mean(seguidora)) %>%
-  mutate(diff = meanl - means)
-
-```
-
 ```{r databases, warning=FALSE, message=FALSE, error=FALSE, include=TRUE, echo = FALSE}
 
 {
 # organizing database
 dLBASE1 = LBASE1 %>% 
+  mutate(position = market,
+         market = case_when(N == 1 ~ "monopoly",
+                            N == 2 ~ "duopoly",
+                            TRUE ~ "oligopoly"),
+         covid_leader = case_when(covid == TRUE & position == "lider" ~ TRUE,
+                                  TRUE ~ FALSE)) %>%  
   ungroup() %>%
   arrange(year, month, air_dep, air_arr, airline) %>%
   group_by(year, month) %>% 
@@ -3693,7 +3620,14 @@ dLBASE1 = pdata.frame(dLBASE1, index = c("id","time")) %>%
 
 {
 # organizing database
-dLBASE1c = LBASE1c %>% 
+dLBASE1c = LBASE1c %>%   
+    mutate(position = market,
+           market = case_when(N == 1 ~ "monopoly",
+                              N == 2 ~ "duopoly",
+                              TRUE ~ "oligopoly"),
+           covid_leader = case_when(covid == TRUE & position == "leader" ~ TRUE,
+                                    TRUE ~ FALSE)) %>% 
+    
   ungroup() %>%
   arrange(year, month, air_dep, air_arr, airline) %>%
   group_by(year, month) %>% 
@@ -3754,18 +3688,16 @@ dLBASE2c = pdata.frame(dLBASE2c, index = c("id","time")) %>%
 # departure dummies | DepHUB | market_dep | capital_dep | region_dep
 
 # defining equations
-OLS = price ~  hubling + aircraft + flight_hours +  
-  connection + X6.11 + X12.17 + X18.23 + RouteShare + factor(Tourist) + factor(N)  + 
-  factor(covid) + factor(covid_wave) + factor(quarter) + factor(ArrHUB) + factor(market_arr) +
-  factor(capital_arr)
+OLS = price ~  hubling + aircraft + flight_hours + MMC + connection + X6.11 + X12.17 + X18.23 + RouteShare + 
+  factor(Tourist) + factor(covid_wave) + factor(quarter) + factor(ArrHUB) +
+  factor(capital_arr) + factor(position) + factor(market) + factor(covid_leader)
 
-IV = price ~ hubling + aircraft + flight_hours +  
-  connection + X6.11 + X12.17 + X18.23 + RouteShare + factor(Tourist) + factor(N) +  
-  factor(covid) + factor(covid_wave) + factor(quarter) + factor(ArrHUB) + factor(market_arr) +
-  factor(capital_arr) | . -RouteShare + m150RouteShare
+IV = price ~ hubling + aircraft + flight_hours + MMC + connection + X6.11 + X12.17 + X18.23 + RouteShare + 
+  factor(Tourist) + factor(covid_wave) + factor(quarter) + factor(ArrHUB) + factor(capital_arr) + factor(position) + 
+  factor(market) + factor(covid_leader) | . -RouteShare + m150RouteShare 
 
-GMM = price ~ lag(price) + hubling + aircraft + flight_hours +  
-  connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:10) + lag(price, 2:10) + m150RouteShare 
+GMM = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
+  connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:17) + lag(price, 2:18) + m150RouteShare
 
 # regression
 ols = plm(OLS, data = dLBASE1, model = "pooling")
@@ -3796,6 +3728,116 @@ gmm = pgmm(GMM, dLBASE1, model = "onestep", effect="individual")
 
 # joining regression results
 screenreg(list(ols = ols, fe = fe, ivfe = ivfe, ecw1 = ecw1, ht1r = ht1r, gmm = gmm),
+               digits = 3, omit.coef = "(Intercept)")
+
+# 1 lag
+GMM0 = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
+  connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:2) + lag(price, 2:3) + m150RouteShare 
+
+# 5 lag
+GMM1 = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
+  connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:7) + lag(price, 2:8) + m150RouteShare 
+
+# 10 lag
+GMM2 = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
+  connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:12) + lag(price, 2:13) + m150RouteShare
+
+# 15 lag
+GMM3 = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
+  connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:17) + lag(price, 2:18) + m150RouteShare
+
+# 20 lag
+GMM4 = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
+  connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:22) + lag(price, 2:23) + m150RouteShare
+
+# Estimating GMM's models
+GMM0 = pgmm(GMM0, dLBASE1, model = "onestep", effect="individual")
+GMM1 = pgmm(GMM1, dLBASE1, model = "onestep", effect="individual")
+GMM2 = pgmm(GMM2, dLBASE1, model = "onestep", effect="individual")
+GMM3 = pgmm(GMM3, dLBASE1, model = "onestep", effect="individual")
+GMM4 = pgmm(GMM4, dLBASE1, model = "onestep", effect="individual")
+
+# joining regression results
+screenreg(list(gmm0 = GMM0, gmm1 = GMM1, gmm2 = GMM2, gmm3 = GMM3, gmm4 = GMM4),
+               digits = 3, omit.coef = "(Intercept)")
+
+```
+
+```{r base1, include = FALSE, echo = FALSE}
+
+# dummies | Tourist | N | market | covid | covid_wave | quarter | airline
+# arrival dummies | ArrHUB | market_arr | region_arr | capital_arr 
+# departure dummies | DepHUB | market_dep | capital_dep | region_dep
+
+# defining equations
+OLS = price ~  hubling + aircraft + flight_hours + MMC + connection + X6.11 + X12.17 + X18.23 + RouteShare
+
+IV = price ~ hubling + aircraft + flight_hours + MMC + connection + X6.11 + X12.17 + X18.23 + 
+  RouteShare | . -RouteShare + m150RouteShare 
+
+GMM = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
+  connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:17) + lag(price, 2:18) + m150RouteShare
+
+# regression
+ols = plm(OLS, data = dLBASE2, model = "pooling")
+fe =  plm(OLS, data = dLBASE2, effect = "individual")
+ivfe = update(fe, IV)
+
+# ec2sls
+ecw1 = plm(IV, data = dLBASE2, model = "within")
+ecr1 = update(ecw1, model = "random", random.method = "nerlove", inst.method = "baltagi")
+
+# Hausman test
+#phtest(ecw1, ecr1) # H1: one model is inconsistent - p_valor < 0,10 : within
+
+# ht2sls
+
+# ec
+ht1r = plm(IV, data = dLBASE2, model = "random", 
+           inst.method = "baltagi", random.method = "ht")
+# w
+ht1w = plm(IV, data = dLBASE2, model = "within", 
+           inst.method = "baltagi", random.method = "ht")
+
+# Hausman test
+#phtest(ht1w, ht1r)
+
+# gmm  
+gmm = pgmm(GMM, dLBASE1, model = "onestep", effect="individual")
+
+# joining regression results
+screenreg(list(ols = ols, fe = fe, ivfe = ivfe, ecw1 = ecw1, ht1r = ht1r, gmm = gmm),
+               digits = 3, omit.coef = "(Intercept)")
+
+# 1 lag
+GMM0 = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
+  connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:2) + lag(price, 2:3) + m150RouteShare 
+
+# 5 lag
+GMM1 = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
+  connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:7) + lag(price, 2:8) + m150RouteShare 
+
+# 10 lag
+GMM2 = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
+  connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:12) + lag(price, 2:13) + m150RouteShare
+
+# 15 lag
+GMM3 = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
+  connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:17) + lag(price, 2:18) + m150RouteShare
+
+# 20 lag
+GMM4 = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
+  connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:22) + lag(price, 2:23) + m150RouteShare
+
+# Estimating GMM's models
+GMM0 = pgmm(GMM0, dLBASE2, model = "onestep", effect="individual")
+GMM1 = pgmm(GMM1, dLBASE2, model = "onestep", effect="individual")
+GMM2 = pgmm(GMM2, dLBASE2, model = "onestep", effect="individual")
+GMM3 = pgmm(GMM3, dLBASE2, model = "onestep", effect="individual")
+GMM4 = pgmm(GMM4, dLBASE2, model = "onestep", effect="individual")
+
+# joining regression results
+screenreg(list(gmm0 = GMM0, gmm1 = GMM1, gmm2 = GMM2, gmm3 = GMM3, gmm4 = GMM4),
                digits = 3, omit.coef = "(Intercept)")
 
 ```
