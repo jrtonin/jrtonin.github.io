@@ -17,7 +17,7 @@ memory.limit(size = 999999999999)
 
 { 
   # Check if the packages that we need are installed
-  want = c("tidyverse", "plm", "texreg", "lmtest", "tibble",
+  want = c("tidyverse", "plm", "texreg", "lmtest", "tibble", "xtable",
            "gluedown", "stringr", "rvest", "kableExtra", "broom", 
            "ggstatsplot", "palmerpenguins", "ggpubr")
   have = want %in% rownames(installed.packages())
@@ -45,7 +45,7 @@ BASE2 = readRDS(url("https://github.com/jrtonin/thesis_data/raw/main/data/final/
 
 ```
 
-#### I - What is the Brazillian airline market estructure?
+#### I - What is the Brazilian airline market structure?
 
 ```{r airline_market, include=TRUE, echo=FALSE}
 
@@ -80,11 +80,11 @@ nmarket = BASE1 %>%
                    take_off = sum(take_off),
                    seat_offer = sum(seat_offer),
                    n = n()) %>%
-  mutate(aircraft = round(seat_offer/take_off, 0),
-         seat_dem = round((seat_dem/n)/1000000, 0),
-         take_off = round((take_off/n)/1000, 0),
-         seat_offer = round((seat_offer/n)/1000000, 0),
-         seat_ocupation = round(seat_dem/seat_offer, 2)*100) %>%
+  mutate(aircraft = round(seat_offer/take_off, 2),
+         seat_dem = round((seat_dem/n)/1000000, 2),
+         take_off = round((take_off/n)/1000, 2),
+         seat_offer = round((seat_offer/n)/1000000, 2),
+         seat_ocupation = round(seat_dem/seat_offer, 4)*100) %>%
   select(seat_dem, take_off, aircraft, seat_ocupation, covid_wave) %>%
   gather(variable, n, seat_dem:seat_ocupation) %>%
   spread(covid_wave, n) %>%
@@ -104,7 +104,11 @@ final = nroutes %>% bind_rows(ncompetitors, nmarket) %>%
                               TRUE ~ variable))
   
 # printing final database
-kable(head(final))
+# kable(head(final))
+
+
+print(xtable(final, type = "latex", file = "filename2.tex"))
+
 
 ```
 
@@ -271,6 +275,8 @@ dcompetition = nroutes %>%
 
 # printing final database
 kable(head(dcompetition, n = 15L)) 
+
+print(xtable(dcompetition, type = "latex", file = "filename2.tex"))
 
 ```
 
