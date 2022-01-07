@@ -3714,32 +3714,34 @@ GMM = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
 # regression
 ols = plm(OLS, data = dLBASE1, model = "pooling")
 fe =  plm(OLS, data = dLBASE1, effect = "individual")
-ivfe = update(fe, IV)
+
+# w2sls
+w2sls = plm(IV, data = dLBASE1, model = "within", effect = "individual")
 
 # ec2sls
-ecw1 = plm(IV, data = dLBASE1, model = "within")
-ecr1 = update(ecw1, model = "random", random.method = "nerlove", inst.method = "baltagi")
+ec2sls = update(ecw1, model = "random", random.method = "nerlove", inst.method = "baltagi") # p_value: 0.1958
 
 # Hausman test
-#phtest(ecw1, ecr1) # H1: one model is inconsistent - p_valor < 0,10 : within
+phtest(w2sls, ec2sls) # H1: one model is inconsistent - p_valor < 0,10 : within
 
 # ht2sls
 
 # ec
 ht1r = plm(IV, data = dLBASE1, model = "random", 
-           inst.method = "baltagi", random.method = "ht")
+           inst.method = "baltagi", random.method = "ht") #p_value 0.1344
 # w
 ht1w = plm(IV, data = dLBASE1, model = "within", 
            inst.method = "baltagi", random.method = "ht")
 
 # Hausman test
-#phtest(ht1w, ht1r)
+phtest(ht1w, ht1r)
 
 # gmm  
 gmm = pgmm(GMM, dLBASE1, model = "onestep", effect="individual")
+summary(gmm)
 
 # joining regression results
-screenreg(list(ols = ols, fe = fe, ivfe = ivfe, ecw1 = ecw1, ht1r = ht1r, gmm = gmm),
+texreg(list(OLS = ols, FE = fe, EC2SLS = ec2sls, HT2SLS = ht1r,  GMM = gmm),
                digits = 3, omit.coef = "(Intercept)")
 
 # 1 lag
