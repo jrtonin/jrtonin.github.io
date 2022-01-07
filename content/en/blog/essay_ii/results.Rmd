@@ -360,6 +360,8 @@ region = darrival %>%
 # printing final database
 kable(head(region, n = 6L)) 
 
+print(xtable(region, type = "latex", file = "filename2.tex"))
+
 ```
 
 Main results found:
@@ -388,6 +390,8 @@ schedulle = BASE1 %>%
 
 # printing final database
 kable(head(schedulle, n = 3L))
+
+print(xtable(schedulle, type = "latex", file = "filename2.tex"))
 
 ```
 
@@ -454,10 +458,12 @@ cprice = BASE1 %>%
                         covid_wave == "first" ~ 2, 
                         TRUE ~ 3)) %>%
   arrange(variable, id) %>%
-  select(-id)
+  select(-id, -`OUT-a.sin`, -`OUT-b.duo`, -`OUT-c.oli`, -`OUT-d.tot`)
 
 # printing final database
 kable(head(cprice, n = 12L))
+
+print(xtable(cprice, type = "latex", file = "filename2.tex"))
 
 ```
  
@@ -1051,7 +1057,7 @@ base = BASE1 %>%
       results.subtitle = FALSE,
       title = "Normal (duopoly)",
       xlab = element_blank(),
-      ylab = "Price (R$)",
+      ylab = "Aircraft (number of seats)",
       ggplot.component = scale_y_continuous(
         breaks = seq(0, 250, 50),
         limits = (c(0, 250)))
@@ -1149,7 +1155,7 @@ base = BASE1 %>%
       results.subtitle = FALSE,
       title = "Normal (oligopoly)",
       xlab = element_blank(),
-      ylab = "Price (R$)",
+      ylab = "Aircraft (number of seats)",
       ggplot.component = scale_y_continuous(
         breaks = seq(0, 250, 50),
         limits = (c(0, 250)))
@@ -1310,7 +1316,7 @@ base = BASE1 %>%
       results.subtitle = FALSE,
       title = "Normal (duopoly)",
       xlab = element_blank(),
-      ylab = "Price (R$)",
+      ylab = "Aircraft (number of seats)",
       ggplot.component = scale_y_continuous(
         breaks = seq(0, 250, 50),
         limits = (c(0, 250)))
@@ -1408,7 +1414,7 @@ base = BASE1 %>%
       results.subtitle = FALSE,
       title = "Normal (oligopoly)",
       xlab = element_blank(),
-      ylab = "Price (R$)",
+      ylab = "Aircraft (number of seats)",
       ggplot.component = scale_y_continuous(
         breaks = seq(0, 250, 50),
         limits = (c(0, 250)))
@@ -2096,7 +2102,7 @@ base = BASE1 %>%
       results.subtitle = FALSE,
       title = "Normal (duopoly)",
       xlab = element_blank(),
-      ylab = "Price (R$)",
+      ylab = "Aircraft (number of seats)",
       ggplot.component = scale_y_continuous(
         breaks = seq(0, 250, 50),
         limits = (c(0, 250)))
@@ -2194,7 +2200,7 @@ base = BASE1 %>%
       results.subtitle = FALSE,
       title = "Normal (oligopoly)",
       xlab = element_blank(),
-      ylab = "Price (R$)",
+      ylab = "Aircraft (number of seats)",
       ggplot.component = scale_y_continuous(
         breaks = seq(0, 250, 50),
         limits = (c(0, 250)))
@@ -2355,7 +2361,7 @@ base = BASE1 %>%
       results.subtitle = FALSE,
       title = "Normal (duopoly)",
       xlab = element_blank(),
-      ylab = "Price (R$)",
+      ylab = "Aircraft (number of seats)",
       ggplot.component = scale_y_continuous(
         breaks = seq(0, 250, 50),
         limits = (c(0, 250)))
@@ -2453,7 +2459,7 @@ base = BASE1 %>%
       results.subtitle = FALSE,
       title = "Normal (oligopoly)",
       xlab = element_blank(),
-      ylab = "Price (R$)",
+      ylab = "Aircraft (number of seats)",
       ggplot.component = scale_y_continuous(
         breaks = seq(0, 250, 50),
         limits = (c(0, 250)))
@@ -3137,7 +3143,7 @@ base = BASE1 %>%
       results.subtitle = FALSE,
       title = "Normal (duopoly)",
       xlab = element_blank(),
-      ylab = "Price (R$)",
+      ylab = "Aircraft (number of seats)",
       ggplot.component = scale_y_continuous(
         breaks = seq(0, 250, 50),
         limits = (c(0, 250)))
@@ -3235,7 +3241,7 @@ base = BASE1 %>%
       results.subtitle = FALSE,
       title = "Normal (oligopoly)",
       xlab = element_blank(),
-      ylab = "Price (R$)",
+      ylab = "Aircraft (number of seats)",
       ggplot.component = scale_y_continuous(
         breaks = seq(0, 250, 50),
         limits = (c(0, 250)))
@@ -3396,7 +3402,7 @@ base = BASE1 %>%
       results.subtitle = FALSE,
       title = "Normal (duopoly)",
       xlab = element_blank(),
-      ylab = "Price (R$)",
+      ylab = "Aircraft (number of seats)",
       ggplot.component = scale_y_continuous(
         breaks = seq(0, 250, 50),
         limits = (c(0, 250)))
@@ -3494,7 +3500,7 @@ base = BASE1 %>%
       results.subtitle = FALSE,
       title = "Normal (oligopoly)",
       xlab = element_blank(),
-      ylab = "Price (R$)",
+      ylab = "Aircraft (number of seats)",
       ggplot.component = scale_y_continuous(
         breaks = seq(0, 250, 50),
         limits = (c(0, 250)))
