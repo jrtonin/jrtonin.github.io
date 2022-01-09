@@ -3603,7 +3603,7 @@ base = BASE1 %>%
 ```
 
  * Tam uses a mixed strategy between Azul and Gol. It operates with smaller aircraft in the markets it acts as a leader and with mixed size in the markets it acts as a follower. In relation to the average prices practiced, the strategy is very close to that verified by Azul, higher prices in relation to competitors, even acting as a leader or follower in the market.
-
+ 
 ```{r databases, warning=FALSE, message=FALSE, error=FALSE, include=TRUE, echo = FALSE}
 
 {
@@ -3693,6 +3693,30 @@ dLBASE2c = pdata.frame(dLBASE2c, index = c("id","time")) %>%
 
 ```
 
+```{r}
+
+# summarizing statistic descriptive
+desc = dLBASE1 %>%
+  mutate(capital_arr = as.numeric(as.factor(capital_arr)),
+         Tourist = as.numeric(as.factor(Tourist)),
+         covid_leader = as.numeric(as.factor(covid_leader)),
+         position = as.numeric(as.factor(position)),
+         ArrHUB = as.numeric(as.factor(ArrHUB))) %>%
+  select(price, hubling, aircraft, flight_hours, MMC, connection, X0.5, X6.11, X12.17, X18.23,
+         RouteShare, Tourist, ArrHUB, capital_arr, position, covid_leader) %>%
+  gather(variable, value, price:covid_leader) %>%
+  group_by(variable) %>%
+  summarise(mean = round(mean(value),2),
+            sd = round(sd(value), 2),
+            min = round(min(value),2),
+            max = round(max(value),2))
+
+
+# print final result
+print(xtable(desc, type = "latex", file = "filename2.tex"))
+
+```
+
 ```{r estimation_I, include = FALSE, echo = FALSE}
 
 # dummies | Tourist | N | market | covid | covid_wave | quarter | airline
@@ -3772,8 +3796,10 @@ GMM3 = pgmm(GMM3, dLBASE1, model = "onestep", effect="individual")
 GMM4 = pgmm(GMM4, dLBASE1, model = "onestep", effect="individual")
 
 # joining regression results
-screenreg(list(gmm0 = GMM0, gmm1 = GMM1, gmm2 = GMM2, gmm3 = GMM3, gmm4 = GMM4),
+texreg(list(gmm0 = GMM0, gmm1 = GMM1, gmm2 = GMM2, gmm3 = GMM3, gmm4 = GMM4),
                digits = 3, omit.coef = "(Intercept)")
+
+summary(GMM4)
 
 ```
 
@@ -3784,26 +3810,27 @@ screenreg(list(gmm0 = GMM0, gmm1 = GMM1, gmm2 = GMM2, gmm3 = GMM3, gmm4 = GMM4),
 # departure dummies | DepHUB | market_dep | capital_dep | region_dep
 
 # defining equations
-OLS = price ~  hubling + aircraft + flight_hours + MMC + connection + X6.11 + X12.17 + X18.23 + RouteShare +
+OLS = price ~  hubling + aircraft + flight_hours + connection + X6.11 + X12.17 + X18.23 + RouteShare +
   factor(Tourist) + factor(covid_wave) + factor(quarter) + factor(ArrHUB)
 
-IV = price ~ hubling + aircraft + flight_hours + MMC + connection + X6.11 + X12.17 + X18.23 + RouteShare +
+IV = price ~ hubling + aircraft + flight_hours + connection + X6.11 + X12.17 + X18.23 + RouteShare +
   factor(Tourist) + factor(covid_wave) + factor(quarter) + factor(ArrHUB) | . -RouteShare + m150RouteShare 
 
-GMM = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
-  connection + X6.11 + X12.17 + X18.23 + RouteShare | llag(RouteShare, 1:2) + lag(price, 2:3) + m150RouteShare
+GMM = price ~ lag(price) + hubling + aircraft + flight_hours +
+  connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:2) + lag(price, 2:3) + m150RouteShare
 
 # regression
 ols = plm(OLS, data = dLBASE2, model = "pooling")
 fe =  plm(OLS, data = dLBASE2, effect = "individual")
-ivfe = update(fe, IV)
+
+# w2sls
+w2sls = plm(IV, data = dLBASE1, model = "within", effect = "individual")
 
 # ec2sls
-ecw1 = plm(IV, data = dLBASE2, model = "within")
-ecr1 = update(ecw1, model = "random", random.method = "nerlove", inst.method = "baltagi")
+ec2sls = update(ecw1, model = "random", random.method = "nerlove", inst.method = "baltagi")
 
 # Hausman test
-#phtest(ecw1, ecr1) # H1: one model is inconsistent - p_valor < 0,10 : within
+phtest(w2sls, ec2sls) # H1: one model is inconsistent - p_valor < 0,10 : within
 
 # ht2sls
 
@@ -3815,33 +3842,34 @@ ht1w = plm(IV, data = dLBASE2, model = "within",
            inst.method = "baltagi", random.method = "ht")
 
 # Hausman test
-#phtest(ht1w, ht1r)
+phtest(ht1r, ht1w)
 
 # gmm  
 gmm = pgmm(GMM, dLBASE2, model = "onestep", effect="individual")
+summary(gmm)
 
 # joining regression results
-screenreg(list(ols = ols, fe = fe, ivfe = ivfe, ecw1 = ecw1, ht1r = ht1r, gmm = gmm),
+texreg(list(OLS = ols, FE = fe, W2SLS = w2sls, HT2SLS = ht1r, GMM = gmm),
                digits = 3, omit.coef = "(Intercept)")
 
 # 1 lag
-GMM0 = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
+GMM0 = price ~ lag(price) + hubling + aircraft + flight_hours +
   connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:2) + lag(price, 2:3) + m150RouteShare 
 
 # 5 lag
-GMM1 = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
+GMM1 = price ~ lag(price) + hubling + aircraft + flight_hours +
   connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:7) + lag(price, 2:8) + m150RouteShare 
 
 # 10 lag
-GMM2 = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
+GMM2 = price ~ lag(price) + hubling + aircraft + flight_hours +
   connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:12) + lag(price, 2:13) + m150RouteShare
 
 # 15 lag
-GMM3 = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
+GMM3 = price ~ lag(price) + hubling + aircraft + flight_hours +
   connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:17) + lag(price, 2:18) + m150RouteShare
 
 # 20 lag
-GMM4 = price ~ lag(price) + hubling + aircraft + flight_hours + MMC +
+GMM4 = price ~ lag(price) + hubling + aircraft + flight_hours +
   connection + X6.11 + X12.17 + X18.23 + RouteShare | lag(RouteShare, 1:22) + lag(price, 2:23) + m150RouteShare
 
 # Estimating GMM's models
@@ -3852,10 +3880,10 @@ GMM3 = pgmm(GMM3, dLBASE2, model = "onestep", effect="individual")
 GMM4 = pgmm(GMM4, dLBASE2, model = "onestep", effect="individual")
 
 # joining regression results
-screenreg(list(gmm0 = GMM0, gmm1 = GMM1, gmm2 = GMM2, gmm3 = GMM3, gmm4 = GMM4),
+texreg(list(gmm0 = GMM0, gmm1 = GMM1, gmm2 = GMM2, gmm3 = GMM3, gmm4 = GMM4),
                digits = 3, omit.coef = "(Intercept)")
 
-summary(GMM0)
+summary(GMM4)
 
 ```
 
